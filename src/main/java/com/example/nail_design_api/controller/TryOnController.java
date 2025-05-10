@@ -64,9 +64,6 @@ public class TryOnController {
             Path resultPath = Paths.get(uploadPath, resultFileName);
             Files.write(resultPath, resultImageBytes);
 
-            // Увеличиваем популярность дизайна
-            design.setPopularity(design.getPopularity() + 1);
-            designRepository.save(design);
 
             // Формируем URL для доступа к результату
             String resultUrl = serverUrl + "/api/images/" + resultFileName;

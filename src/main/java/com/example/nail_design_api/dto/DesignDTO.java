@@ -1,17 +1,47 @@
 package com.example.nail_design_api.dto;
 
 
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+
 public class DesignDTO {
     private String id;
+    private String name;
+    private String description;
     private String imageURL;
     private String thumbnailURL;
     private String designType;
-    private String color;
+    private List<String> color;
     private String occasion;
     private String length;
     private String material;
+    private MultipartFile image;
 
-    // Геттеры и сеттеры
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public MultipartFile getImage() {
+        return image;
+    }
+
+    public void setImage(MultipartFile image) {
+        this.image = image;
+    }
+
     public String getId() {
         return id;
     }
@@ -44,11 +74,11 @@ public class DesignDTO {
         this.designType = designType;
     }
 
-    public String getColor() {
+    public List<String> getColor() {
         return color;
     }
 
-    public void setColor(String color) {
+    public void setColor(List<String> color) {
         this.color = color;
     }
 

@@ -2,26 +2,41 @@ package com.example.nail_design_api.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-import java.util.Date;
 
-@Document(collection = "designs")
+import java.util.List;
+
+@Document("designs")
 public class Design {
-    @Id
-    private String id;
+    @Id private String id;
     private String name;
     private String description;
-    private String imagePath;
-    private String thumbnailPath;
+    private List<String> colors;
     private String designType;
-    private String color;
     private String occasion;
     private String length;
     private String material;
-    private int popularity;
-    private Date createdAt;
-    private boolean isPremium;
+    private String imagePath;
+    private String thumbnailPath;         // путь к миниатюре
 
-    // Геттеры и сеттеры
+    // Пустой конструктор нужен Spring / Mongo и нашему сервису
+    public Design() {}
+
+    // Все-аргументный конструктор (для удобства, если надо)
+    public Design(String id, String name, String description, List<String> colors,
+                  String designType, String occasion, String length,
+                  String material, String imagePath, String thumbnailPath) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.colors = colors;
+        this.designType = designType;
+        this.occasion = occasion;
+        this.length = length;
+        this.material = material;
+        this.imagePath = imagePath;
+        this.thumbnailPath = thumbnailPath;
+    }
+
     public String getId() {
         return id;
     }
@@ -46,20 +61,12 @@ public class Design {
         this.description = description;
     }
 
-    public String getImagePath() {
-        return imagePath;
+    public List<String> getColors() {
+        return colors;
     }
 
-    public void setImagePath(String imagePath) {
-        this.imagePath = imagePath;
-    }
-
-    public String getThumbnailPath() {
-        return thumbnailPath;
-    }
-
-    public void setThumbnailPath(String thumbnailPath) {
-        this.thumbnailPath = thumbnailPath;
+    public void setColors(List<String> colors) {
+        this.colors = colors;
     }
 
     public String getDesignType() {
@@ -68,14 +75,6 @@ public class Design {
 
     public void setDesignType(String designType) {
         this.designType = designType;
-    }
-
-    public String getColor() {
-        return color;
-    }
-
-    public void setColor(String color) {
-        this.color = color;
     }
 
     public String getOccasion() {
@@ -102,27 +101,19 @@ public class Design {
         this.material = material;
     }
 
-    public int getPopularity() {
-        return popularity;
+    public String getImagePath() {
+        return imagePath;
     }
 
-    public void setPopularity(int popularity) {
-        this.popularity = popularity;
+    public void setImagePath(String imagePath) {
+        this.imagePath = imagePath;
     }
 
-    public Date getCreatedAt() {
-        return createdAt;
+    public String getThumbnailPath() {
+        return thumbnailPath;
     }
 
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public boolean isPremium() {
-        return isPremium;
-    }
-
-    public void setPremium(boolean premium) {
-        isPremium = premium;
+    public void setThumbnailPath(String thumbnailPath) {
+        this.thumbnailPath = thumbnailPath;
     }
 }

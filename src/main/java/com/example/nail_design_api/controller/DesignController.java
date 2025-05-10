@@ -1,83 +1,34 @@
 package com.example.nail_design_api.controller;
 
-
-import com.example.nail_design_api.dto.DesignDTO;
-import com.example.nail_design_api.service.DesignService;
+import com.example.nail_design_api.dto.DesignFilterDto;
+import com.example.nail_design_api.model.Design;
+import com.example.nail_design_api.repository.DesignRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/designs")
 public class DesignController {
-
     @Autowired
-    private DesignService designService;
-
-    @Value("${upload.path}")
-    private String uploadPath;
+    private DesignRepository repo;
 
     @GetMapping
-    public ResponseEntity<List<DesignDTO>> getAllDesigns(
-            @RequestParam(required = false) String designType,
-            @RequestParam(required = false) String color,
-            @RequestParam(required = false) String occasion,
-            @RequestParam(required = false) String length,
-            @RequestParam(required = false) String material) {
-
-        List<DesignDTO> designs = designService.searchDesigns(
-                designType, color, occasion, length, material);
-
-        return ResponseEntity.ok(designs);
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<DesignDTO> getDesignById(@PathVariable String id) {
-        DesignDTO design = designService.getDesignById(id);
-        return ResponseEntity.ok(design);
-    }
-
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<DesignDTO> createDesign(
-            @RequestParam String name,
-            @RequestParam String description,
-            @RequestParam String designType,
-            @RequestParam String color,
-            @RequestParam String occasion,
-            @RequestParam String length,
-            @RequestParam String material,
-            @RequestParam MultipartFile image) {
-
-        try {
-            DesignDTO design = designService.createDesign(
-                    name, description, designType, color, occasion, length, material, image);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(design);
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    @GetMapping("/images/{filename}")
-    public ResponseEntity<Resource> getImage(@PathVariable String filename) {
-        Resource resource = new FileSystemResource(Paths.get(uploadPath, filename));
-
-        if (resource.exists()) {
-            return ResponseEntity.ok()
-                    .contentType(MediaType.IMAGE_JPEG) // Или определяйте тип по расширению файла
-                    .body(resource);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+    public List<Design> getDesigns(
+            @RequestParam(required = false) List<String> colors,
+            @RequestParam(required = false) List<String> styles,
+            @RequestParam(required = false) List<String> seasons,
+            @RequestParam(required = false) List<String> types
+    ) {
+        // Простая пост-фильтрация в памяти:
+        List<Design> all = repo.findAll();
+        return all.stream().filter(d ->
+                (colors   == null || colors.isEmpty()   || colors.contains(d.getColors()))   &&
+                        (styles   == null || styles.isEmpty()   || styles.contains(d.getDesignType())) &&
+                        (seasons  == null || seasons.isEmpty()  || seasons.contains(d.getOccasion()))   &&
+                        (types    == null || types.isEmpty()    || types.contains(d.getLength()))      // подставьте реальные поля
+        ).collect(Collectors.toList());
     }
 }

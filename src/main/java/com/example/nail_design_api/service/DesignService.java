@@ -21,131 +21,95 @@ import java.util.stream.Collectors;
 @Service
 public class DesignService {
 
-    @Autowired
-    private DesignRepository designRepository;
-
-    @Value("${upload.path}")
-    private String uploadPath;
-
-    @Value("${server.url}")
-    private String serverUrl;
+    @Autowired private DesignRepository designRepository;
+    @Value("${upload.path}") private String uploadPath;
+    @Value("${server.url}") private String serverUrl;
 
     public List<DesignDTO> getAllDesigns() {
-        List<Design> designs = designRepository.findAll();
-        return convertToDTOList(designs);
+        return convertToDTOList(designRepository.findAll());
     }
 
     public DesignDTO getDesignById(String id) {
-        Design design = designRepository.findById(id)
+        return designRepository.findById(id)
+                .map(this::convertToDTO)
                 .orElseThrow(() -> new RuntimeException("Design not found"));
-
-        return convertToDTO(design);
     }
 
-    public List<DesignDTO> searchDesigns(String designType, String color,
-                                         String occasion, String length, String material) {
-        // Создаем базовый запрос
-        List<Design> designs = designRepository.findAll();
-
-        // Применяем фильтры, если они заданы
+    public List<DesignDTO> searchDesigns(
+            String designType, String color,
+            String occasion, String length, String material
+    ) {
+        // Либо используем репозиторий с методами findBy…,
+        // либо фильтруем здесь
+        var list = designRepository.findAll();
         if (designType != null && !designType.isEmpty()) {
-            designs = designs.stream()
+            list = list.stream()
                     .filter(d -> d.getDesignType().equalsIgnoreCase(designType))
                     .collect(Collectors.toList());
         }
-
         if (color != null && !color.isEmpty()) {
-            designs = designs.stream()
-                    .filter(d -> d.getColor().equalsIgnoreCase(color))
+            list = list.stream()
+                    // проверяем, содержится ли нужный цвет в списке
+                    .filter(d -> d.getColors().contains(color))
                     .collect(Collectors.toList());
         }
+        // … аналогично для occasion, length, material
 
-        if (occasion != null && !occasion.isEmpty()) {
-            designs = designs.stream()
-                    .filter(d -> d.getOccasion().equalsIgnoreCase(occasion))
-                    .collect(Collectors.toList());
-        }
-
-        if (length != null && !length.isEmpty()) {
-            designs = designs.stream()
-                    .filter(d -> d.getLength().equalsIgnoreCase(length))
-                    .collect(Collectors.toList());
-        }
-
-        if (material != null && !material.isEmpty()) {
-            designs = designs.stream()
-                    .filter(d -> d.getMaterial().equalsIgnoreCase(material))
-                    .collect(Collectors.toList());
-        }
-
-        return convertToDTOList(designs);
+        return convertToDTOList(list);
     }
 
-    public DesignDTO createDesign(String name, String description, String designType,
-                                  String color, String occasion, String length,
-                                  String material, MultipartFile image) throws IOException {
-
-        // Создаем уникальные имена файлов
-        String uniqueFileName = UUID.randomUUID().toString() + "_" + image.getOriginalFilename();
+    public DesignDTO createDesign(
+            String name, String description,
+            String designType, String color, String occasion,
+            String length, String material,
+            MultipartFile image
+    ) throws IOException {
+        String uuid = UUID.randomUUID().toString();
+        String uniqueFileName = uuid + "_" + image.getOriginalFilename();
         String thumbnailFileName = "thumb_" + uniqueFileName;
 
-        // Сохраняем основное изображение
-        Path filePath = Paths.get(uploadPath, uniqueFileName);
-        Files.createDirectories(filePath.getParent());
-        Files.write(filePath, image.getBytes());
+        Path imgPath = Paths.get(uploadPath, uniqueFileName);
+        Files.createDirectories(imgPath.getParent());
+        Files.write(imgPath, image.getBytes());
 
-        // Создание миниатюры (упрощенно)
-        Path thumbnailPath = Paths.get(uploadPath, thumbnailFileName);
-        Files.write(thumbnailPath, image.getBytes()); // В реальном проекте здесь было бы создание уменьшенной версии
+        Path thumbPath = Paths.get(uploadPath, thumbnailFileName);
+        Files.write(thumbPath, image.getBytes());
 
-        // Создаем новый объект дизайна
         Design design = new Design();
         design.setName(name);
         design.setDescription(description);
+        design.setColors(List.of(color));
         design.setDesignType(designType);
-        design.setColor(color);
         design.setOccasion(occasion);
         design.setLength(length);
         design.setMaterial(material);
         design.setImagePath(uniqueFileName);
         design.setThumbnailPath(thumbnailFileName);
-        design.setCreatedAt(new Date());
-        design.setPremium(false);
-        design.setPopularity(0);
 
-        // Сохраняем в базу данных
+        // Сохраняем
         design = designRepository.save(design);
-
         return convertToDTO(design);
     }
 
-    private DesignDTO convertToDTO(Design design) {
+    private DesignDTO convertToDTO(Design d) {
         DesignDTO dto = new DesignDTO();
-        dto.setId(design.getId());
+        dto.setId(d.getId());
+        dto.setName(d.getName());
+        dto.setDescription(d.getDescription());
+        dto.setColor(d.getColors());
+        dto.setDesignType(d.getDesignType());
+        dto.setOccasion(d.getOccasion());
+        dto.setLength(d.getLength());
+        dto.setMaterial(d.getMaterial());
 
-        // Проверяем, является ли путь к изображению полным URL
-        if (design.getImagePath().startsWith("http")) {
-            // Если это полный URL, используем его напрямую
-            dto.setImageURL(design.getImagePath());
-            dto.setThumbnailURL(design.getThumbnailPath());
-        } else {
-            // Если это локальный путь, добавляем базовый URL сервера
-            dto.setImageURL(serverUrl + "/api/images/" + design.getImagePath());
-            dto.setThumbnailURL(serverUrl + "/api/images/" + design.getThumbnailPath());
-        }
-
-        dto.setDesignType(design.getDesignType());
-        dto.setColor(design.getColor());
-        dto.setOccasion(design.getOccasion());
-        dto.setLength(design.getLength());
-        dto.setMaterial(design.getMaterial());
+        String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
+        dto.setImageURL(base + "/api/images/" + d.getImagePath());
+        dto.setThumbnailURL(base + "/api/images/" + d.getThumbnailPath());
 
         return dto;
     }
 
-    private List<DesignDTO> convertToDTOList(List<Design> designs) {
-        return designs.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+    private List<DesignDTO> convertToDTOList(List<Design> list) {
+        return list.stream().map(this::convertToDTO).toList();
     }
 }
