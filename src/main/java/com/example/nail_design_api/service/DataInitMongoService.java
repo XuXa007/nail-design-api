@@ -1,4 +1,3 @@
-// src/main/java/com/example/nail_design_api/service/DataInitMongoService.java
 package com.example.nail_design_api.service;
 
 import com.example.nail_design_api.model.Design;
@@ -27,33 +26,31 @@ public class DataInitMongoService implements CommandLineRunner {
             mongo.dropCollection(Design.class);
             mongo.createCollection(Design.class);
 
-            // Строим несколько документов с правильным количеством параметров
             List<Design> demos = List.of(
                     new Design(
-                            null,                 // id
-                            "French Manicure",    // name
-                            "Классический френч", // description (добавлено)
-                            List.of("white"),     // colors
-                            "French",             // designType
-                            "Everyday",           // occasion
-                            "Medium",             // length
-                            "Gel",                // material
-                            "french.jpg",         // imagePath
-                            "french_thumb.jpg"    // thumbnailPath (добавлено)
+                            null,
+                            "French Manicure",
+                            "Классический френч",
+                            List.of("white"),
+                            "French",
+                            "Everyday",
+                            "Medium",
+                            "Gel",
+                            "french.jpg",
+                            "french_thumb.jpg"
                     ),
                     new Design(
-                            null,                 // id
-                            "Glitter Ombre",      // name
-                            "Блестящий омбре",    // description (добавлено)
-                            List.of("pink"),      // colors
-                            "Ombre",              // designType
-                            "Party",              // occasion
-                            "Long",               // length
-                            "Acrylic",            // material
-                            "glitter.jpg",        // imagePath
-                            "glitter_thumb.jpg"   // thumbnailPath (добавлено)
+                            null,
+                            "Glitter Ombre",
+                            "Блестящий омбре",
+                            List.of("pink"),
+                            "Ombre",
+                            "Party",
+                            "Long",
+                            "Acrylic",
+                            "glitter.jpg",
+                            "glitter_thumb.jpg"
                     )
-                    // … остальные
             );
             repo.saveAll(demos);
             System.out.println("✅ Mongo initialized with sample designs");

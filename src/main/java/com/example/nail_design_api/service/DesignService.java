@@ -2,18 +2,17 @@ package com.example.nail_design_api.service;
 
 import com.example.nail_design_api.dto.DesignDTO;
 import com.example.nail_design_api.model.Design;
+//import com.example.nail_design_api.dto.DesignDto;
 import com.example.nail_design_api.repository.DesignRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -39,8 +38,7 @@ public class DesignService {
             String designType, String color,
             String occasion, String length, String material
     ) {
-        // Либо используем репозиторий с методами findBy…,
-        // либо фильтруем здесь
+
         var list = designRepository.findAll();
         if (designType != null && !designType.isEmpty()) {
             list = list.stream()
@@ -53,7 +51,7 @@ public class DesignService {
                     .filter(d -> d.getColors().contains(color))
                     .collect(Collectors.toList());
         }
-        // … аналогично для occasion, length, material
+        // … аналогично для occasion, length, material ????
 
         return convertToDTOList(list);
     }
@@ -86,7 +84,6 @@ public class DesignService {
         design.setImagePath(uniqueFileName);
         design.setThumbnailPath(thumbnailFileName);
 
-        // Сохраняем
         design = designRepository.save(design);
         return convertToDTO(design);
     }
@@ -96,15 +93,15 @@ public class DesignService {
         dto.setId(d.getId());
         dto.setName(d.getName());
         dto.setDescription(d.getDescription());
-        dto.setColor(d.getColors());
+        dto.setColors(d.getColors());
         dto.setDesignType(d.getDesignType());
         dto.setOccasion(d.getOccasion());
         dto.setLength(d.getLength());
         dto.setMaterial(d.getMaterial());
 
         String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
-        dto.setImageURL(base + "/api/images/" + d.getImagePath());
-        dto.setThumbnailURL(base + "/api/images/" + d.getThumbnailPath());
+//        dto.setImagePath(base + "/api/images/" + d.getImagePath());
+//        dto.setThumbnailPath(base + "/api/images/" + d.getThumbnailPath());
 
         return dto;
     }

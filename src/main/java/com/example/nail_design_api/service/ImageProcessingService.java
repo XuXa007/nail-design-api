@@ -19,13 +19,6 @@ public class ImageProcessingService {
     @Value("${python.script.path}")
     private String pythonScriptPath;
 
-    /**
-     * Обрабатывает изображение руки и применяет к ней дизайн ногтей.
-     *
-     * @param handImage Изображение руки пользователя
-     * @param designImagePath Путь к изображению дизайна
-     * @return Байты результирующего изображения
-     */
     public byte[] applyDesignToHand(byte[] handImage, String designImagePath) throws IOException, InterruptedException {
         // Сохраняем входящее изображение во временный файл
         String handImageFilename = UUID.randomUUID().toString() + ".jpg";
@@ -65,13 +58,6 @@ public class ImageProcessingService {
         return resultImage;
     }
 
-    /**
-     * Запускает Python-скрипт для обнаружения ногтей на изображении.
-     *
-     * @param inputImagePath Путь к входящему изображению
-     * @param outputMaskPath Путь для сохранения маски
-     * @return true, если скрипт успешно выполнен
-     */
     private boolean runNailDetectionScript(String inputImagePath, String outputMaskPath) throws IOException, InterruptedException {
         // Формируем команду для запуска скрипта
         ProcessBuilder pb = new ProcessBuilder(
@@ -102,15 +88,6 @@ public class ImageProcessingService {
         return exitCode == 0;
     }
 
-    /**
-     * Запускает Python-скрипт для наложения дизайна на ногти с использованием маски.
-     *
-     * @param baseImagePath Путь к базовому изображению
-     * @param designImagePath Путь к изображению дизайна
-     * @param maskPath Путь к маске ногтей
-     * @param resultPath Путь для сохранения результата
-     * @return true, если скрипт успешно выполнен
-     */
     private boolean runApplyDesignScript(String baseImagePath, String designImagePath, String maskPath, String resultPath) throws IOException, InterruptedException {
         // Формируем команду для запуска скрипта
         ProcessBuilder pb = new ProcessBuilder(

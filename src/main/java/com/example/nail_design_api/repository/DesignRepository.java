@@ -8,5 +8,4 @@ import java.util.List;
 
 public interface DesignRepository extends MongoRepository<Design,String> {
     List<Design> findByColorsIn(List<String> colors);
-    // можно добавить остальные методы findBy…
 }

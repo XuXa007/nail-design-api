@@ -1,84 +1,65 @@
 package com.example.nail_design_api.controller;
 
-import com.example.nail_design_api.model.Design;
 import com.example.nail_design_api.repository.DesignRepository;
-import com.example.nail_design_api.service.ImageProcessingService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
+import com.example.nail_design_api.service.MlService;
+import org.springframework.beans.factory.annotation.*;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import reactor.core.publisher.Mono;
 
-import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/ar")
+@RequestMapping("/api/tryon")
 public class TryOnController {
-
-    @Autowired
-    private DesignRepository designRepository;
-
-    @Autowired
-    private ImageProcessingService imageProcessingService;
 
     @Value("${upload.path}")
     private String uploadPath;
 
-    @Value("${server.url}")
-    private String serverUrl;
+    private final DesignRepository designRepo;
+    private final MlService mlService;
 
-    /**
-     * Применяет дизайн к фотографии руки.
-     *
-     * @param designId ID дизайна
-     * @param photo Фотография руки
-     * @return URL к результирующему изображению
-     */
-    @PostMapping("/apply-design")
-    public ResponseEntity<?> applyDesign(
+    public TryOnController(DesignRepository designRepo, MlService mlService) {
+        this.designRepo = designRepo;
+        this.mlService = mlService;
+    }
+
+    @PostMapping(produces = MediaType.IMAGE_PNG_VALUE)
+    public Mono<ResponseEntity<byte[]>> tryOn(
+            @RequestParam("photo") MultipartFile photo,
             @RequestParam("designId") String designId,
-            @RequestParam("photo") MultipartFile photo) {
+            @RequestParam(defaultValue = "0.7") double threshold,
+            @RequestParam(defaultValue = "1.0") double opacity
+    ) {
+        return Mono.justOrEmpty(designRepo.findById(designId))
+                .switchIfEmpty(Mono.error(new RuntimeException("Design not found")))
+                .flatMap(design -> {
+                    try {
+                        byte[] base = photo.getBytes();
+                        Path p = Paths.get(uploadPath).resolve(design.getImagePath());
+                        byte[] designImg = Files.readAllBytes(p);
 
-        try {
-            // Получаем дизайн из репозитория
-            Design design = designRepository.findById(designId)
-                    .orElseThrow(() -> new RuntimeException("Design not found"));
+                        return mlService.getMask(base, threshold)
+                                .flatMap(maskRes -> {
+                                    byte[] mask = maskRes.getByteArray();
+                                    return mlService.blend(base, designImg, mask, opacity);
+                                });
 
-            // Получаем путь к изображению дизайна
-            String designImagePath = Paths.get(uploadPath, design.getImagePath()).toString();
-
-            // Используем сервис для обработки изображения
-            byte[] resultImageBytes = imageProcessingService.applyDesignToHand(
-                    photo.getBytes(), designImagePath);
-
-            // Сохраняем результат в файл
-            String resultFileName = UUID.randomUUID().toString() + "_result.png";
-            Path resultPath = Paths.get(uploadPath, resultFileName);
-            Files.write(resultPath, resultImageBytes);
-
-
-            // Формируем URL для доступа к результату
-            String resultUrl = serverUrl + "/api/images/" + resultFileName;
-
-            // Возвращаем URL в ответе
-            Map<String, String> response = new HashMap<>();
-            response.put("imageUrl", resultUrl);
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-        }
+                    } catch (Exception ex) {
+                        return Mono.error(ex);
+                    }
+                })
+                .map(ByteArrayResource::getByteArray)
+                .map(bytes -> ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(bytes))
+                .onErrorResume(e -> Mono.just(
+                        ResponseEntity.status(500)
+                                .contentType(MediaType.TEXT_PLAIN)
+                                .body(("Error: " + e.getMessage()).getBytes())
+                ));
     }
 }

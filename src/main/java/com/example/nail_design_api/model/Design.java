@@ -16,12 +16,10 @@ public class Design {
     private String length;
     private String material;
     private String imagePath;
-    private String thumbnailPath;         // путь к миниатюре
+    private String thumbnailPath;
 
-    // Пустой конструктор нужен Spring / Mongo и нашему сервису
     public Design() {}
 
-    // Все-аргументный конструктор (для удобства, если надо)
     public Design(String id, String name, String description, List<String> colors,
                   String designType, String occasion, String length,
                   String material, String imagePath, String thumbnailPath) {

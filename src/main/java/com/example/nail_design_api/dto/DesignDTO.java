@@ -1,22 +1,25 @@
 package com.example.nail_design_api.dto;
 
-
-import org.springframework.web.multipart.MultipartFile;
-
 import java.util.List;
 
 public class DesignDTO {
     private String id;
     private String name;
     private String description;
-    private String imageURL;
-    private String thumbnailURL;
+    private List<String> colors;
     private String designType;
-    private List<String> color;
     private String occasion;
     private String length;
     private String material;
-    private MultipartFile image;
+    private String imagePath;
+    private String thumbnailPath;
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
 
     public String getName() {
         return name;
@@ -34,36 +37,12 @@ public class DesignDTO {
         this.description = description;
     }
 
-    public MultipartFile getImage() {
-        return image;
+    public List<String> getColors() {
+        return colors;
     }
 
-    public void setImage(MultipartFile image) {
-        this.image = image;
-    }
-
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public String getImageURL() {
-        return imageURL;
-    }
-
-    public void setImageURL(String imageURL) {
-        this.imageURL = imageURL;
-    }
-
-    public String getThumbnailURL() {
-        return thumbnailURL;
-    }
-
-    public void setThumbnailURL(String thumbnailURL) {
-        this.thumbnailURL = thumbnailURL;
+    public void setColors(List<String> colors) {
+        this.colors = colors;
     }
 
     public String getDesignType() {
@@ -72,14 +51,6 @@ public class DesignDTO {
 
     public void setDesignType(String designType) {
         this.designType = designType;
-    }
-
-    public List<String> getColor() {
-        return color;
-    }
-
-    public void setColor(List<String> color) {
-        this.color = color;
     }
 
     public String getOccasion() {
@@ -104,5 +75,21 @@ public class DesignDTO {
 
     public void setMaterial(String material) {
         this.material = material;
+    }
+
+    public String getImagePath() {
+        return imagePath;
+    }
+
+    public void setImagePath(String imagePath) {
+        this.imagePath = imagePath;
+    }
+
+    public String getThumbnailPath() {
+        return thumbnailPath;
+    }
+
+    public void setThumbnailPath(String thumbnailPath) {
+        this.thumbnailPath = thumbnailPath;
     }
 }
