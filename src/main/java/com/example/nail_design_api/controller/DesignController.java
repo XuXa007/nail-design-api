@@ -32,8 +32,10 @@ public class DesignController {
             dto.setOccasion(d.getOccasion());
             dto.setLength(d.getLength());
             dto.setMaterial(d.getMaterial());
+
             dto.setImagePath(serverUrl + "/uploads/" + d.getImagePath());
             dto.setThumbnailPath(serverUrl + "/uploads/" + d.getThumbnailPath());
+
             return dto;
         }).collect(Collectors.toList());
     }

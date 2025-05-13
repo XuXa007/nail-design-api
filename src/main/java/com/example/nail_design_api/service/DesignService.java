@@ -100,8 +100,8 @@ public class DesignService {
         dto.setMaterial(d.getMaterial());
 
         String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
-//        dto.setImagePath(base + "/api/images/" + d.getImagePath());
-//        dto.setThumbnailPath(base + "/api/images/" + d.getThumbnailPath());
+        dto.setImagePath(base + "/uploads/" + d.getImagePath());
+        dto.setThumbnailPath(base + "/uploads/" + d.getThumbnailPath());
 
         return dto;
     }

@@ -68,9 +68,9 @@ public class FavoritesService {
         dto.setOccasion(d.getOccasion());
         dto.setLength(d.getLength());
         dto.setMaterial(d.getMaterial());
-        String base = "http://localhost:8080";
-        dto.setImagePath(base + "/api/images/" + d.getImagePath());
-        dto.setThumbnailPath(base + "/api/images/" + d.getThumbnailPath());
+        String base = "http://192.168.1.5:8080";
+        dto.setImagePath(base + "/uploads/" + d.getImagePath());
+        dto.setThumbnailPath(base + "/uploads/" + d.getThumbnailPath());
         return dto;
     }
 }

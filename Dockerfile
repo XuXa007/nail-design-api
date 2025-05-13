@@ -8,7 +8,7 @@ COPY ${JAR_FILE} app.jar
 
 RUN mkdir -p /app/uploads
 
-COPY src/main/resources/test-images/* /app/uploads/
+COPY uploads/* /app/uploads/
 
 EXPOSE 8080
 

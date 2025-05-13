@@ -7,10 +7,10 @@ services:
       - "8080:8080"
     depends_on:
       - mongodb
+      - ml-service
     environment:
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/nail_design_db
       ML_SERVICE_URL: http://ml-service:8000
-      UPLOAD_PATH: /app/uploads
     volumes:
       - ./uploads:/app/uploads
 
@@ -20,6 +20,12 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+
+  ml-service:
+    build: ./ml-service
+    ports:
+      - "8000:8000"
+
 
 volumes:
   mongo_data:
