@@ -1,6 +1,7 @@
 package com.example.nail_design_api.service;
 
 import com.example.nail_design_api.dto.DesignDTO;
+import com.example.nail_design_api.dto.DesignFilterDto;
 import com.example.nail_design_api.model.Design;
 //import com.example.nail_design_api.dto.DesignDto;
 import com.example.nail_design_api.repository.DesignRepository;
@@ -108,5 +109,55 @@ public class DesignService {
 
     private List<DesignDTO> convertToDTOList(List<Design> list) {
         return list.stream().map(this::convertToDTO).toList();
+    }
+
+    public List<DesignDTO> filterDesigns(DesignFilterDto filter) {
+        List<Design> filteredDesigns;
+
+        if ((filter.getColors() == null || filter.getColors().isEmpty()) &&
+                (filter.getStyles() == null || filter.getStyles().isEmpty()) &&
+                (filter.getSeasons() == null || filter.getSeasons().isEmpty()) &&
+                (filter.getTypes() == null || filter.getTypes().isEmpty())) {
+            filteredDesigns = designRepository.findAll();
+        } else {
+            List<String> colors = filter.getColors() != null ? filter.getColors() : List.of();
+            List<String> styles = filter.getStyles() != null ? filter.getStyles() : List.of();
+            List<String> seasons = filter.getSeasons() != null ? filter.getSeasons() : List.of();
+            List<String> types = filter.getTypes() != null ? filter.getTypes() : List.of();
+
+            if (!colors.isEmpty() || !styles.isEmpty() || !seasons.isEmpty() || !types.isEmpty()) {
+                List<Design> result = designRepository.findAll();
+
+                if (!colors.isEmpty()) {
+                    result = result.stream()
+                            .filter(d -> d.getColors().stream().anyMatch(colors::contains))
+                            .toList();
+                }
+
+                if (!styles.isEmpty()) {
+                    result = result.stream()
+                            .filter(d -> styles.contains(d.getDesignType()))
+                            .toList();
+                }
+
+                if (!seasons.isEmpty()) {
+                    result = result.stream()
+                            .filter(d -> seasons.contains(d.getOccasion()))
+                            .toList();
+                }
+
+                if (!types.isEmpty()) {
+                    result = result.stream()
+                            .filter(d -> types.contains(d.getLength()))
+                            .toList();
+                }
+
+                filteredDesigns = result;
+            } else {
+                filteredDesigns = designRepository.findAll();
+            }
+        }
+
+        return convertToDTOList(filteredDesigns);
     }
 }
