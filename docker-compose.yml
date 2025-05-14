@@ -25,7 +25,7 @@ services:
     build: ./ml-service
     ports:
       - "8000:8000"
-
-
+    volumes:
+      - ./uploads:/app/uploads
 volumes:
   mongo_data:

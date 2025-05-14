@@ -1,18 +1,16 @@
 package com.example.nail_design_api.controller;
 
+import com.example.nail_design_api.model.Design;
 import com.example.nail_design_api.repository.DesignRepository;
 import com.example.nail_design_api.service.MlService;
 import org.springframework.beans.factory.annotation.*;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Mono;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/tryon")
@@ -20,6 +18,9 @@ public class TryOnController {
 
     @Value("${upload.path}")
     private String uploadPath;
+
+    @Value("${ml.service.url}")
+    private String mlServiceUrl;
 
     private final DesignRepository designRepo;
     private final MlService mlService;
@@ -34,32 +35,46 @@ public class TryOnController {
             @RequestParam("photo") MultipartFile photo,
             @RequestParam("designId") String designId,
             @RequestParam(defaultValue = "0.7") double threshold,
-            @RequestParam(defaultValue = "1.0") double opacity
+            @RequestParam(defaultValue = "0.9") double opacity
     ) {
-        return Mono.justOrEmpty(designRepo.findById(designId))
-                .switchIfEmpty(Mono.error(new RuntimeException("Design not found")))
-                .flatMap(design -> {
-                    try {
-                        byte[] base = photo.getBytes();
-                        Path p = Paths.get(uploadPath).resolve(design.getImagePath());
-                        byte[] designImg = Files.readAllBytes(p);
+        System.out.println("Received try-on request: designId=" + designId);
 
-                        return mlService.getMask(base, threshold)
-                                .flatMap(maskRes -> {
-                                    byte[] mask = maskRes.getByteArray();
-                                    return mlService.blend(base, designImg, mask, opacity);
-                                });
+        Optional<Design> designOpt = designRepo.findById(designId);
 
-                    } catch (Exception ex) {
-                        return Mono.error(ex);
-                    }
-                })
-                .map(ByteArrayResource::getByteArray)
-                .map(bytes -> ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(bytes))
-                .onErrorResume(e -> Mono.just(
-                        ResponseEntity.status(500)
+        if (designOpt.isEmpty()) {
+            System.out.println("Design not found by ID: " + designId);
+            return Mono.just(ResponseEntity.status(404)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(("Design not found: " + designId).getBytes()));
+        }
+
+        Design design = designOpt.get();
+        System.out.println("Found design: " + design.getName() + ", image: " + design.getImagePath());
+
+        try {
+            byte[] photoBytes = photo.getBytes();
+
+            return mlService.processImageDirectly(photoBytes, design.getImagePath(), threshold, opacity)
+                    .map(bytes -> {
+                        System.out.println("Successfully processed image: " + bytes.length + " bytes");
+                        return ResponseEntity.ok()
+                                .contentType(MediaType.IMAGE_PNG)
+                                .body(bytes);
+                    })
+                    .onErrorResume(e -> {
+                        System.out.println("Error processing image: " + e.getMessage());
+                        e.printStackTrace();
+                        return Mono.just(ResponseEntity.status(500)
                                 .contentType(MediaType.TEXT_PLAIN)
-                                .body(("Error: " + e.getMessage()).getBytes())
-                ));
+                                .body(("Error: " + e.getMessage()).getBytes()));
+                    });
+
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            return Mono.just(ResponseEntity.status(500)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(("Error: " + e.getMessage()).getBytes()));
+        }
     }
 }

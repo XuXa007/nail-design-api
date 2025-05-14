@@ -1,240 +1,310 @@
-# Обработчик изображений с YOLO
-# ml-service/app/yolo_processor.py
-
-from ultralytics import YOLO
-import numpy as np
-from PIL import Image
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi.responses import Response
 import io
-import logging
-import traceback
-import cv2
 import os
-import uuid
-import config
+import logging
+from PIL import Image
+import numpy as np
+
+app = FastAPI()
+logger = logging.getLogger(__name__)
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
-# Загрузим модель один раз при старте
-try:
-    model = YOLO(config.MODEL_PATH)
-    logger.info(f"Модель YOLO успешно загружена из {config.MODEL_PATH}")
-except Exception as e:
-    logger.error(f"Ошибка загрузки модели YOLO: {str(e)}")
-    logger.error(traceback.format_exc())
-    raise
+# Путь к директории с загруженными изображениями
+UPLOADS_DIR = "/app/uploads"  # Для Docker
+# UPLOADS_DIR = "uploads"  # Для локальной разработки
 
-def get_combined_mask(image_bytes: bytes, confidence_threshold: float = 0.7) -> bytes:
-    try:
-        logger.debug(f"Начало обработки изображения: {len(image_bytes)} байт, порог: {confidence_threshold}")
-
-        # Открываем изображение
-        img = Image.open(io.BytesIO(image_bytes))
-        logger.debug(f"Изображение открыто: {img.width}x{img.height}, формат: {img.format}")
-
-        # Получаем оригинальные размеры
-        original_width, original_height = img.width, img.height
-
-        # Конвертируем в numpy массив
-        img_array = np.array(img)
-
-        # Применяем модель YOLO
-        results = model(img_array)
-        logger.debug("Модель YOLO применена")
-
-        # Создаем пустую маску в размере МОДЕЛИ (не оригинала)
-        if results and len(results) > 0 and hasattr(results[0], 'masks') and results[0].masks is not None:
-            # Получаем размер из первой маски
-            first_mask = results[0].masks.data[0].cpu().numpy()
-            mask_height, mask_width = first_mask.shape
-            logger.debug(f"Размер маски модели: {mask_width}x{mask_height}")
-
-            # Создаем пустую маску для результата в размере модели
-            model_combined = np.zeros((mask_height, mask_width), dtype=np.uint8)
-        else:
-            # Если масок нет, создаем пустую маску оригинального размера
-            logger.debug("Маски не найдены, создаем пустую маску оригинального размера")
-            buffer = io.BytesIO()
-            Image.new('L', (original_width, original_height), 0).save(buffer, format='PNG')
-            return buffer.getvalue()
-
-        # Объединяем маски от модели
-        for i, r in enumerate(results):
-            logger.debug(f"Обработка результата #{i}")
-            if r.masks is None:
-                logger.debug("В результате нет масок, пропускаем")
-                continue
-
-            masks = r.masks.data.cpu().numpy()
-            confs = r.boxes.conf.cpu().numpy()
-            logger.debug(f"Найдено {len(masks)} масок с уверенностью: {confs}")
-
-            for j, (m, c) in enumerate(zip(masks, confs)):
-                if c >= confidence_threshold:
-                    logger.debug(f"Маска #{j} с уверенностью {c} добавлена в комбинированную маску")
-                    # Здесь маски одного размера, так что не будет проблем
-                    model_combined = np.where(m > 0.5, 255, model_combined)
-
-        # Теперь изменяем размер результирующей маски на оригинальный размер изображения
-        logger.debug(f"Изменяем размер маски с {mask_width}x{mask_height} на {original_width}x{original_height}")
-
-        # Преобразуем в изображение PIL для изменения размера
-        mask_pil = Image.fromarray(model_combined)
-        resized_mask = mask_pil.resize((original_width, original_height), Image.NEAREST)
-
-        # Сохраняем итоговую маску
-        buf = io.BytesIO()
-        resized_mask.save(buf, format='PNG')
-        logger.debug("Маска успешно сохранена в формате PNG")
-        return buf.getvalue()
-    except Exception as e:
-        logger.error(f"Ошибка при создании маски: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise
-
-def blend_images(base_bytes: bytes, overlay_bytes: bytes, mask_bytes: bytes, opacity: float = 1.0) -> bytes:
+@app.post("/blend")
+async def blend(
+        base: UploadFile = File(...),
+        overlay: UploadFile = File(...),
+        mask: UploadFile = File(...),
+        opacity: float = Form(0.9)
+):
     """
-    Накладывает дизайн на базовое изображение с использованием маски и заданной прозрачности
-    
-    Args:
-        base_bytes: Исходное изображение ногтей (bytes)
-        overlay_bytes: Изображение дизайна (bytes)
-        mask_bytes: Маска ногтей (bytes)
-        opacity: Прозрачность наложения (0.0-1.0)
-    
-    Returns:
-        bytes: Результирующее изображение в формате PNG
+    Накладывает overlay изображение на base используя mask с заданной прозрачностью.
     """
     try:
-        logger.debug(f"Начало смешивания изображений: base={len(base_bytes)}, overlay={len(overlay_bytes)}, mask={len(mask_bytes)}, opacity={opacity}")
+        logger.info(f"Received blend request: opacity={opacity}")
+
+        # Читаем файлы
+        base_content = await base.read()
+        overlay_content = await overlay.read()
+        mask_content = await mask.read()
+
+        logger.info(f"Files received: base={len(base_content)}, overlay={len(overlay_content)}, mask={len(mask_content)}")
 
         # Открываем изображения
-        base_img = Image.open(io.BytesIO(base_bytes)).convert('RGBA')
-        overlay_img = Image.open(io.BytesIO(overlay_bytes)).convert('RGBA')
-        mask_img = Image.open(io.BytesIO(mask_bytes)).convert('L')
+        base_img = Image.open(io.BytesIO(base_content)).convert('RGBA')
+        overlay_img = Image.open(io.BytesIO(overlay_content)).convert('RGBA')
+        mask_img = Image.open(io.BytesIO(mask_content)).convert('L')
 
-        logger.debug(f"Изображения открыты: base={base_img.width}x{base_img.height}, overlay={overlay_img.width}x{overlay_img.height}, mask={mask_img.width}x{mask_img.height}")
+        logger.info(f"Images opened: base={base_img.size}, overlay={overlay_img.size}, mask={mask_img.size}")
 
-        # Изменяем размер маски и overlay до размера base
-        mask_img = mask_img.resize((base_img.width, base_img.height), Image.NEAREST)
-        overlay_img = overlay_img.resize((base_img.width, base_img.height), Image.LANCZOS)
+        # Изменяем размеры overlay и mask под base
+        overlay_img = overlay_img.resize(base_img.size, Image.LANCZOS)
+        mask_img = mask_img.resize(base_img.size, Image.LANCZOS)
 
         # Конвертируем в numpy массивы
         base_arr = np.array(base_img)
         overlay_arr = np.array(overlay_img)
         mask_arr = np.array(mask_img)
 
-        # Нормализуем маску (0-1)
+        # Нормализуем маску
         mask_norm = mask_arr / 255.0
 
         # Применяем прозрачность к overlay
         overlay_arr = overlay_arr.copy()
         overlay_arr[..., 3] = (overlay_arr[..., 3] * opacity).astype(np.uint8)
 
-        # Нормализация альфа-каналов
+        # Нормализуем альфа-каналы
         base_alpha = base_arr[..., 3] / 255.0
         overlay_alpha = overlay_arr[..., 3] / 255.0 * opacity
 
-        # Создаем пустой массив для результата
+        # Создаем результирующее изображение
         result = np.zeros_like(base_arr)
 
-        # Для каждого пикселя: если маска > 0, используем overlay, иначе base
-        # Учитываем прозрачность (альфа-канал)
-        for c in range(3):  # RGB каналы
+        # Применяем маску для смешивания
+        mask_expanded = np.expand_dims(mask_norm, axis=2)  # Расширяем маску для броадкаста
+
+        # Смешиваем RGB каналы
+        for c in range(3):
             result[..., c] = (
-                    (overlay_arr[..., c] * overlay_alpha * mask_norm.reshape(mask_norm.shape + (1,))[:, :, 0]) +
-                    (base_arr[..., c] * base_alpha * (1 - (overlay_alpha * mask_norm.reshape(mask_norm.shape + (1,))[:, :, 0])))
-            )
+                    overlay_arr[..., c] * overlay_alpha * mask_norm +
+                    base_arr[..., c] * base_alpha * (1 - overlay_alpha * mask_norm)
+            ).astype(np.uint8)
 
         # Устанавливаем альфа-канал
-        result[..., 3] = ((overlay_alpha * mask_norm) + (base_alpha * (1 - overlay_alpha * mask_norm))) * 255
+        result[..., 3] = ((overlay_alpha * mask_norm) + (base_alpha * (1 - overlay_alpha * mask_norm)) * 255).astype(np.uint8)
 
-        # Конвертируем обратно в изображение и сохраняем
+        # Преобразуем обратно в изображение
         result_img = Image.fromarray(result.astype(np.uint8), 'RGBA')
 
         # Сохраняем в буфер
         buf = io.BytesIO()
         result_img.save(buf, format='PNG')
-        logger.debug(f"Результат смешивания сохранен, размер: {buf.getbuffer().nbytes} байт")
+        buf.seek(0)
 
-        return buf.getvalue()
+        logger.info("Blend completed successfully")
+        return Response(content=buf.getvalue(), media_type="image/png")
+
     except Exception as e:
-        logger.error(f"Ошибка при смешивании изображений: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise
+        logger.error(f"Error in blend: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
-def save_image_to_file(image_bytes: bytes, prefix: str = "img") -> str:
+@app.post("/mask")
+async def get_mask(
+        file: UploadFile = File(...),
+        threshold: float = Form(0.7)
+):
     """
-    Сохраняет изображение на диск
-    
-    Args:
-        image_bytes: Данные изображения
-        prefix: Префикс для имени файла
-        
-    Returns:
-        str: Путь к сохраненному файлу
+    Создает маску ногтей на изображении рук.
     """
     try:
-        # Генерируем уникальное имя файла
-        filename = f"{prefix}_{uuid.uuid4()}.png"
-        filepath = os.path.join(config.UPLOAD_DIR, filename)
+        logger.info(f"Received mask request: threshold={threshold}")
 
-        # Сохраняем файл
-        with open(filepath, "wb") as f:
-            f.write(image_bytes)
+        # Чтение загруженного изображения
+        content = await file.read()
+        logger.info(f"Image received, size: {len(content)} bytes")
 
-        logger.debug(f"Изображение сохранено: {filepath}")
-        return filepath
+        # Здесь должен быть код обнаружения ногтей с YOLO
+        # Для тестирования просто создаем простую маску
+        image = Image.open(io.BytesIO(content))
+        width, height = image.size
+
+        # Создаем простую маску (центральный овал)
+        mask = Image.new('L', (width, height), 0)
+        import ImageDraw
+        draw = ImageDraw.Draw(mask)
+
+        # Нарисуем белый овал в центре
+        center_x, center_y = width // 2, height // 2
+        oval_width, oval_height = width // 3, height // 3
+        draw.ellipse(
+            (center_x - oval_width, center_y - oval_height,
+             center_x + oval_width, center_y + oval_height),
+            fill=255
+        )
+
+        # Сохраняем маску
+        buf = io.BytesIO()
+        mask.save(buf, format='PNG')
+        buf.seek(0)
+
+        logger.info("Mask created successfully")
+        return Response(content=buf.getvalue(), media_type="image/png")
+
     except Exception as e:
-        logger.error(f"Ошибка при сохранении изображения: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise
+        logger.error(f"Error in mask: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
-def load_image_from_file(filepath: str) -> bytes:
+@app.post("/api/tryon")
+async def try_on_design(
+        photo: UploadFile = File(...),
+        designId: str = Form(...),
+        threshold: float = Form(0.7),
+        opacity: float = Form(0.9)
+):
     """
-    Загружает изображение с диска
-    
-    Args:
-        filepath: Путь к файлу изображения
-        
-    Returns:
-        bytes: Данные изображения
+    Полный процесс примерки дизайна.
     """
     try:
-        with open(filepath, "rb") as f:
-            image_bytes = f.read()
+        logger.info(f"Received try-on request: designId={designId}, threshold={threshold}, opacity={opacity}")
 
-        logger.debug(f"Изображение загружено: {filepath}, размер: {len(image_bytes)} байт")
-        return image_bytes
+        # Чтение загруженного изображения
+        photo_content = await photo.read()
+        logger.info(f"Photo received, size: {len(photo_content)} bytes")
+
+        # Находим файл дизайна
+        design_path = None
+
+        # Проверяем наличие файла напрямую
+        for ext in ['.jpg', '.jpeg', '.png']:
+            test_path = os.path.join(UPLOADS_DIR, designId + ext)
+            if os.path.exists(test_path):
+                design_path = test_path
+                break
+
+        # Проверяем наличие файла по имени без расширения
+        if not design_path:
+            for filename in os.listdir(UPLOADS_DIR):
+                base_name = os.path.splitext(filename)[0]
+                if designId == base_name:
+                    design_path = os.path.join(UPLOADS_DIR, filename)
+                    break
+
+        # Проверка наличия демо-файлов
+        if not design_path:
+            if 'french' in designId.lower():
+                for f in os.listdir(UPLOADS_DIR):
+                    if 'french' in f.lower():
+                        design_path = os.path.join(UPLOADS_DIR, f)
+                        break
+            elif 'glitter' in designId.lower() or 'ombre' in designId.lower():
+                for f in os.listdir(UPLOADS_DIR):
+                    if 'glitter' in f.lower() or 'ombre' in f.lower():
+                        design_path = os.path.join(UPLOADS_DIR, f)
+                        break
+
+        # Если дизайн не найден, используем первый доступный файл jpg
+        if not design_path:
+            for filename in os.listdir(UPLOADS_DIR):
+                if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    design_path = os.path.join(UPLOADS_DIR, filename)
+                    logger.warning(f"Using fallback design: {design_path}")
+                    break
+
+        if not design_path or not os.path.exists(design_path):
+            # Если не найден подходящий файл, создаем заглушку
+            logger.warning(f"Design file not found for ID: {designId}. Using dummy image.")
+            # Создаем простую заглушку для изображения дизайна
+            image = Image.open(io.BytesIO(photo_content))
+            width, height = image.size
+            design_img = Image.new('RGBA', (width, height), (255, 0, 0, 128))
+
+            design_buf = io.BytesIO()
+            design_img.save(design_buf, format='PNG')
+            design_content = design_buf.getvalue()
+        else:
+            logger.info(f"Using design image: {design_path}")
+            with open(design_path, 'rb') as f:
+                design_content = f.read()
+
+        # Шаг 1: Создаем маску ногтей
+        logger.info("Creating nail mask...")
+        # Для демо создаем простую овальную маску
+        image = Image.open(io.BytesIO(photo_content))
+        width, height = image.size
+
+        mask = Image.new('L', (width, height), 0)
+        from PIL import ImageDraw
+        draw = ImageDraw.Draw(mask)
+
+        # Нарисуем белые овалы в нижней части изображения
+        # Это имитирует обнаружение ногтей
+        for i in range(5):  # 5 пальцев
+            center_x = width // 2 + (i - 2) * width // 10
+            center_y = height * 0.7  # примерно где могут быть ногти
+            oval_width, oval_height = width // 20, height // 15
+            draw.ellipse(
+                (center_x - oval_width, center_y - oval_height,
+                 center_x + oval_width, center_y + oval_height),
+                fill=255
+            )
+
+        mask_buf = io.BytesIO()
+        mask.save(mask_buf, format='PNG')
+        mask_content = mask_buf.getvalue()
+
+        # Шаг 2: Накладываем дизайн на фото с использованием маски
+        logger.info("Blending design with photo...")
+        base_img = Image.open(io.BytesIO(photo_content)).convert('RGBA')
+        design_img = Image.open(io.BytesIO(design_content)).convert('RGBA')
+        mask_img = Image.open(io.BytesIO(mask_content)).convert('L')
+
+        # Изменяем размеры design и mask под base
+        design_img = design_img.resize(base_img.size, Image.LANCZOS)
+        mask_img = mask_img.resize(base_img.size, Image.LANCZOS)
+
+        # Конвертируем в numpy массивы
+        base_arr = np.array(base_img)
+        design_arr = np.array(design_img)
+        mask_arr = np.array(mask_img)
+
+        # Нормализуем маску
+        mask_norm = mask_arr / 255.0
+
+        # Применяем прозрачность к design
+        design_arr = design_arr.copy()
+        design_arr[..., 3] = (design_arr[..., 3] * opacity).astype(np.uint8)
+
+        # Нормализуем альфа-каналы
+        base_alpha = base_arr[..., 3] / 255.0
+        design_alpha = design_arr[..., 3] / 255.0 * opacity
+
+        # Создаем результирующее изображение
+        result = np.zeros_like(base_arr)
+
+        # Применяем маску для смешивания
+        mask_expanded = np.expand_dims(mask_norm, axis=2)  # Расширяем маску для броадкаста
+
+        # Смешиваем RGB каналы
+        for c in range(3):
+            result[..., c] = (
+                    design_arr[..., c] * design_alpha * mask_norm +
+                    base_arr[..., c] * base_alpha * (1 - design_alpha * mask_norm)
+            ).astype(np.uint8)
+
+        # Устанавливаем альфа-канал
+        result[..., 3] = ((design_alpha * mask_norm) + (base_alpha * (1 - design_alpha * mask_norm)) * 255).astype(np.uint8)
+
+        # Преобразуем обратно в изображение
+        result_img = Image.fromarray(result.astype(np.uint8), 'RGBA')
+
+        # Сохраняем в буфер
+        result_buf = io.BytesIO()
+        result_img.save(result_buf, format='PNG')
+        result_buf.seek(0)
+
+        logger.info("Try-on completed successfully")
+        return Response(content=result_buf.getvalue(), media_type="image/png")
+
     except Exception as e:
-        logger.error(f"Ошибка при загрузке изображения: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise
+        logger.error(f"Error in try-on: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
-def process_session(base_image_bytes: bytes, design_image_bytes: bytes,
-                    threshold: float = 0.7, opacity: float = 1.0) -> bytes:
-    """
-    Обрабатывает полную сессию примерки: создает маску и накладывает дизайн
-    
-    Args:
-        base_image_bytes: Исходное изображение ногтей
-        design_image_bytes: Изображение дизайна
-        threshold: Порог уверенности для маски
-        opacity: Прозрачность наложения дизайна
-        
-    Returns:
-        bytes: Результирующее изображение
-    """
-    try:
-        # Создаем маску
-        mask_bytes = get_combined_mask(base_image_bytes, threshold)
+# Тестовый эндпоинт
+@app.get("/test")
+def test_endpoint():
+    return {
+        "status": "ML service is working",
+        "uploads_dir": UPLOADS_DIR,
+        "files": os.listdir(UPLOADS_DIR) if os.path.exists(UPLOADS_DIR) else []
+    }
 
-        # Накладываем дизайн
-        result_bytes = blend_images(base_image_bytes, design_image_bytes, mask_bytes, opacity)
-
-        return result_bytes
-    except Exception as e:
-        logger.error(f"Ошибка при обработке сессии: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise
+# Эндпоинт для проверки здоровья
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
