@@ -5,6 +5,7 @@ import com.example.nail_design_api.model.User;
 import com.example.nail_design_api.repository.DesignRepository;
 import com.example.nail_design_api.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
@@ -19,7 +20,7 @@ public class FavoritesService {
 
     @Autowired
     private DesignRepository designRepository;
-
+    @Value("${server.url}") private String serverUrl;
 
     private User getOrCreateUser(String username) {
         return userRepository.findByUsername(username)
@@ -68,7 +69,7 @@ public class FavoritesService {
         dto.setOccasion(d.getOccasion());
         dto.setLength(d.getLength());
         dto.setMaterial(d.getMaterial());
-        String base = "http://192.168.1.5:8080";
+        String base = serverUrl;
         dto.setImagePath(base + "/uploads/" + d.getImagePath());
         dto.setThumbnailPath(base + "/uploads/" + d.getThumbnailPath());
         return dto;
