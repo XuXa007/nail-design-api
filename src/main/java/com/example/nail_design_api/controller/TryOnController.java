@@ -52,8 +52,10 @@ public class TryOnController {
         System.out.println("Found design: " + design.getName() + ", image: " + design.getImagePath());
 
         try {
+            // Получаем байты фото
             byte[] photoBytes = photo.getBytes();
 
+            // Используем новый прямой метод для обработки
             return mlService.processImageDirectly(photoBytes, design.getImagePath(), threshold, opacity)
                     .map(bytes -> {
                         System.out.println("Successfully processed image: " + bytes.length + " bytes");

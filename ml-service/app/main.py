@@ -3,8 +3,8 @@ from fastapi.responses import Response
 import io
 import os
 import logging
-from PIL import Image
 import numpy as np
+from PIL import Image, ImageDraw
 
 app = FastAPI()
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ async def blend(
     try:
         logger.info(f"Received blend request: opacity={opacity}")
 
-        # Читаем файлы
+        # Чтение файлов
         base_content = await base.read()
         overlay_content = await overlay.read()
         mask_content = await mask.read()
@@ -55,6 +55,9 @@ async def blend(
         # Нормализуем маску
         mask_norm = mask_arr / 255.0
 
+        # Преобразуем маску для броадкаста
+        mask_reshaped = mask_norm.reshape(mask_norm.shape + (1,))
+
         # Применяем прозрачность к overlay
         overlay_arr = overlay_arr.copy()
         overlay_arr[..., 3] = (overlay_arr[..., 3] * opacity).astype(np.uint8)
@@ -65,9 +68,6 @@ async def blend(
 
         # Создаем результирующее изображение
         result = np.zeros_like(base_arr)
-
-        # Применяем маску для смешивания
-        mask_expanded = np.expand_dims(mask_norm, axis=2)  # Расширяем маску для броадкаста
 
         # Смешиваем RGB каналы
         for c in range(3):
@@ -116,7 +116,6 @@ async def get_mask(
 
         # Создаем простую маску (центральный овал)
         mask = Image.new('L', (width, height), 0)
-        import ImageDraw
         draw = ImageDraw.Draw(mask)
 
         # Нарисуем белый овал в центре
@@ -219,7 +218,6 @@ async def try_on_design(
         width, height = image.size
 
         mask = Image.new('L', (width, height), 0)
-        from PIL import ImageDraw
         draw = ImageDraw.Draw(mask)
 
         # Нарисуем белые овалы в нижней части изображения
@@ -236,6 +234,7 @@ async def try_on_design(
 
         mask_buf = io.BytesIO()
         mask.save(mask_buf, format='PNG')
+        mask_buf.seek(0)
         mask_content = mask_buf.getvalue()
 
         # Шаг 2: Накладываем дизайн на фото с использованием маски
@@ -267,9 +266,6 @@ async def try_on_design(
         # Создаем результирующее изображение
         result = np.zeros_like(base_arr)
 
-        # Применяем маску для смешивания
-        mask_expanded = np.expand_dims(mask_norm, axis=2)  # Расширяем маску для броадкаста
-
         # Смешиваем RGB каналы
         for c in range(3):
             result[..., c] = (
@@ -298,11 +294,20 @@ async def try_on_design(
 # Тестовый эндпоинт
 @app.get("/test")
 def test_endpoint():
-    return {
-        "status": "ML service is working",
-        "uploads_dir": UPLOADS_DIR,
-        "files": os.listdir(UPLOADS_DIR) if os.path.exists(UPLOADS_DIR) else []
-    }
+    try:
+        files = os.listdir(UPLOADS_DIR) if os.path.exists(UPLOADS_DIR) else []
+        logger.info(f"Test endpoint called. Files in uploads: {files}")
+        return {
+            "status": "ML service is working",
+            "uploads_dir": UPLOADS_DIR,
+            "files": files
+        }
+    except Exception as e:
+        logger.error(f"Error in test endpoint: {str(e)}", exc_info=True)
+        return {
+            "status": "Error",
+            "error": str(e)
+        }
 
 # Эндпоинт для проверки здоровья
 @app.get("/health")
