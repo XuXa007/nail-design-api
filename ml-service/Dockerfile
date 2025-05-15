@@ -23,17 +23,10 @@ ENV MODEL_PATH=/app/best.pt \
     UPLOAD_DIR=/app/uploads \
     RESULT_DIR=/app/results \
     DEFAULT_CONFIDENCE=0.7 \
-    DEFAULT_OPACITY=1.0
+    DEFAULT_OPACITY=0.9
 
 # Копируем файлы приложения
 COPY app/ .
-
-# Если модель best.pt не включена в репозиторий, раскомментируйте следующие строки
-# для скачивания модели при сборке контейнера (замените URL на фактический):
-# RUN wget -O best.pt https://path-to-your-model/best.pt
-
-# Тест наличия модели, показываем содержимое директории
-RUN ls -la /app/
 
 # Запускаем приложение
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

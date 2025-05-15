@@ -1,6 +1,5 @@
 package com.example.nail_design_api.service;
 
-import com.example.nail_design_api.model.Design;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -24,7 +23,8 @@ public class MlService {
      * Выполняет полный процесс примерки дизайна через единый эндпоинт
      */
     public Mono<byte[]> processImageDirectly(byte[] photoBytes, String designId, double threshold, double opacity) {
-        logger.info("Processing image directly with ML service. designId: {}, threshold: {}, opacity: {}", designId, threshold, opacity);
+        logger.info("Processing image directly with ML service. designId: {}, threshold: {}, opacity: {}, photo size: {} bytes",
+                designId, threshold, opacity, photoBytes.length);
 
         var body = new LinkedMultiValueMap<String, Object>();
         body.add("photo", new ByteArrayResource(photoBytes) {
@@ -40,7 +40,8 @@ public class MlService {
                 .body(BodyInserters.fromMultipartData(body))
                 .retrieve()
                 .bodyToMono(byte[].class)
+                .doOnSubscribe(s -> logger.info("Starting request to ML service"))
                 .doOnSuccess(res -> logger.info("Successfully received processed image: {} bytes", res.length))
-                .doOnError(e -> logger.error("Error processing image: {}", e.getMessage()));
+                .doOnError(e -> logger.error("Error processing image: {}", e.getMessage(), e));
     }
 }

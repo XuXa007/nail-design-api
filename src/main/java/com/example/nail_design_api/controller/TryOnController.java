@@ -38,6 +38,7 @@ public class TryOnController {
             @RequestParam(defaultValue = "0.9") double opacity
     ) {
         System.out.println("Received try-on request: designId=" + designId);
+        System.out.println("Photo size: " + photo.getSize() + " bytes");
 
         Optional<Design> designOpt = designRepo.findById(designId);
 
@@ -54,8 +55,9 @@ public class TryOnController {
         try {
             // Получаем байты фото
             byte[] photoBytes = photo.getBytes();
+            System.out.println("Photo bytes loaded: " + photoBytes.length + " bytes");
 
-            // Используем новый прямой метод для обработки
+            // Используем ML сервис для обработки
             return mlService.processImageDirectly(photoBytes, design.getImagePath(), threshold, opacity)
                     .map(bytes -> {
                         System.out.println("Successfully processed image: " + bytes.length + " bytes");
@@ -63,12 +65,17 @@ public class TryOnController {
                                 .contentType(MediaType.IMAGE_PNG)
                                 .body(bytes);
                     })
-                    .onErrorResume(e -> {
+                    .doOnError(e -> {
                         System.out.println("Error processing image: " + e.getMessage());
+                        e.printStackTrace();
+                    })
+                    .onErrorResume(e -> {
+                        String errorMessage = "Error processing image: " + e.getMessage();
+                        System.out.println(errorMessage);
                         e.printStackTrace();
                         return Mono.just(ResponseEntity.status(500)
                                 .contentType(MediaType.TEXT_PLAIN)
-                                .body(("Error: " + e.getMessage()).getBytes()));
+                                .body(errorMessage.getBytes()));
                     });
 
         } catch (Exception e) {
