@@ -7,8 +7,10 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.time.Duration;
 
 @Service
 public class MlService {
@@ -40,6 +42,7 @@ public class MlService {
                 .body(BodyInserters.fromMultipartData(body))
                 .retrieve()
                 .bodyToMono(byte[].class)
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(1)).maxBackoff(Duration.ofSeconds(5)))
                 .doOnSubscribe(s -> logger.info("Starting request to ML service"))
                 .doOnSuccess(res -> logger.info("Successfully received processed image: {} bytes", res.length))
                 .doOnError(e -> logger.error("Error processing image: {}", e.getMessage(), e));

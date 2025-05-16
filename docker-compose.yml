@@ -11,7 +11,7 @@ services:
     environment:
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/nail_design_db
       ML_SERVICE_URL: http://ml-service:8000
-      SERVER_URL: http://172.20.10.7:8080
+      SERVER_URL: http://192.168.1.8:8080
     volumes:
       - ./uploads:/app/uploads
 
@@ -28,5 +28,7 @@ services:
       - "8000:8000"
     volumes:
       - ./uploads:/app/uploads
+      - ./ml-service/temp:/app/temp
+
 volumes:
   mongo_data:
