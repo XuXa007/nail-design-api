@@ -1,26 +1,36 @@
+# ml-service/Dockerfile
+
 FROM python:3.10-slim
 
 WORKDIR /app
 
-# Установка зависимостей для OpenCV
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Установка системных зависимостей
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Копирование файлов зависимостей
+COPY requirements.txt .
 
 # Установка Python-зависимостей
-COPY ./app/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Создание директорий
+RUN mkdir -p /app/models /app/designs /app/uploads
 
 # Копирование кода приложения
 COPY app/ .
 
-# Создание директорий для хранения файлов
-RUN mkdir -p /app/models /app/uploads
+# Переменные среды
+ENV MODEL_PATH=/app/models/best.pt
+ENV DESIGNS_FOLDER=/app/designs
+ENV PORT=8000
 
-# Увеличение лимитов на файлы
-ENV UVICORN_TIMEOUT_KEEP_ALIVE=120
-ENV UVICORN_WORKERS=1
+# Порт для API
+EXPOSE 8000
 
 # Запуск приложения
 CMD ["python", "app.py"]

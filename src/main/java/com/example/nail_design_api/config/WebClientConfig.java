@@ -3,7 +3,9 @@ package com.example.nail_design_api.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
@@ -12,23 +14,22 @@ import java.time.Duration;
 
 @Configuration
 public class WebClientConfig {
+
+    @Value("${ml-service.connection-timeout:60000}")
+    private int connectionTimeout;
+
+    @Value("${ml-service.read-timeout:60000}")
+    private int readTimeout;
+
     @Bean
-    public WebClient mlClient(@Value("${ml.service.url}") String baseUrl) {
-        int size = 32 * 1024 * 1024;
+    public RestTemplate restTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
 
-        final ExchangeStrategies strategies = ExchangeStrategies.builder()
-                .codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(size))
-                .build();
+        // Устанавливаем увеличенные таймауты для работы с ML сервисом,
+        // так как обработка изображений может занимать время
+        factory.setConnectTimeout(connectionTimeout);
+        factory.setReadTimeout(readTimeout);
 
-        HttpClient httpClient = HttpClient.create()
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 60000) // 60 секунд на подключение
-                .responseTimeout(Duration.ofSeconds(120)) // 120 секунд на ответ
-                .wiretap(true); // включить детальное логирование для отладки
-
-        return WebClient.builder()
-                .baseUrl(baseUrl)
-                .exchangeStrategies(strategies)
-                .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .build();
+        return new RestTemplate(factory);
     }
 }

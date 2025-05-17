@@ -1,4 +1,4 @@
-version: '3.8'
+# docker-compose.yml
 
 services:
   app:
@@ -23,12 +23,18 @@ services:
       - mongo_data:/data/db
 
   ml-service:
-    build: ./ml-service
+    build:
+      context: ./ml-service
     ports:
       - "8000:8000"
     volumes:
       - ./uploads:/app/uploads
-      - ./ml-service/temp:/app/temp
+      - ./ml-service/models:/app/models
+      - ./ml-service/designs:/app/designs
+    environment:
+      - MODEL_PATH=/app/models/best.pt
+      - DESIGNS_FOLDER=/app/designs
+      - PORT=8000
 
 volumes:
   mongo_data:

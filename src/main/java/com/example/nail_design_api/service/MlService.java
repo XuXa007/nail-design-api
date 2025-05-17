@@ -1,50 +1,82 @@
 package com.example.nail_design_api.service;
 
+import com.example.nail_design_api.model.Design;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
-import reactor.util.retry.Retry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.time.Duration;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.logging.Logger;
 
 @Service
 public class MlService {
-    private static final Logger logger = LoggerFactory.getLogger(MlService.class);
-    private final WebClient client;
 
-    public MlService(WebClient mlClient) {
-        this.client = mlClient;
+    private static final Logger logger = Logger.getLogger(MlService.class.getName());
+
+    @Value("${ml-service.url}")
+    private String mlServiceUrl;
+
+    private final RestTemplate restTemplate;
+
+    public MlService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
     }
 
-    /**
-     * Выполняет полный процесс примерки дизайна через единый эндпоинт
-     */
-    public Mono<byte[]> processImageDirectly(byte[] photoBytes, String designId, double threshold, double opacity) {
-        logger.info("Processing image directly with ML service. designId: {}, threshold: {}, opacity: {}, photo size: {} bytes",
-                designId, threshold, opacity, photoBytes.length);
+    public ResponseEntity<byte[]> processImageWithMlService(MultipartFile photo, Design design,
+                                                            double threshold, double opacity) {
+        try {
+            logger.info("Processing image directly with ML service. designId: " + design.getId() +
+                    ", threshold: " + threshold + ", opacity: " + opacity);
 
-        var body = new LinkedMultiValueMap<String, Object>();
-        body.add("photo", new ByteArrayResource(photoBytes) {
-            @Override public String getFilename() { return "hand.jpg"; }
-        });
-        body.add("designId", designId);
-        body.add("threshold", String.valueOf(threshold));
-        body.add("opacity", String.valueOf(opacity));
+            // Формируем URL
+            String url = mlServiceUrl + "/api/tryon?threshold=" + threshold + "&opacity=" + opacity;
 
-        return client.post()
-                .uri("/api/tryon")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(body))
-                .retrieve()
-                .bodyToMono(byte[].class)
-                .retryWhen(Retry.backoff(3, Duration.ofSeconds(1)).maxBackoff(Duration.ofSeconds(5)))
-                .doOnSubscribe(s -> logger.info("Starting request to ML service"))
-                .doOnSuccess(res -> logger.info("Successfully received processed image: {} bytes", res.length))
-                .doOnError(e -> logger.error("Error processing image: {}", e.getMessage(), e));
+            // Подготавливаем multipart/form-data
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+
+            // Добавляем изображение
+            ByteArrayResource photoResource = new ByteArrayResource(photo.getBytes()) {
+                @Override
+                public String getFilename() {
+                    return photo.getOriginalFilename();
+                }
+            };
+            body.add("photo", photoResource);
+
+            // ВАЖНО: Передаем ID дизайна, а не имя файла
+            body.add("designId", design.getId());
+
+            // Настраиваем заголовки
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+            // Создаем запрос
+            HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+            // Отправляем запрос в ML сервис
+            ResponseEntity<byte[]> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    requestEntity,
+                    byte[].class
+            );
+
+            // Настраиваем заголовки ответа
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.setContentType(MediaType.IMAGE_JPEG);
+            responseHeaders.setCacheControl(CacheControl.noCache().getHeaderValue());
+
+            // Возвращаем обработанное изображение
+            return new ResponseEntity<>(response.getBody(), responseHeaders, HttpStatus.OK);
+
+        } catch (Exception e) {
+            logger.severe("Error processing image: " + e.getMessage());
+            throw new RuntimeException("Error processing image", e);
+        }
     }
 }
