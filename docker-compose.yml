@@ -27,8 +27,6 @@ services:
     entrypoint: ["mongosh", "mongodb://mongodb:27017/nail_design_db"]
     depends_on:
       - mongodb
-    networks:
-      - default
 
   ml-service:
     build:
