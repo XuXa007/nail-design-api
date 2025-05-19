@@ -1,19 +1,40 @@
+#services:
+#  app:
+#    build: .
+#    ports:
+#      - "8080:8080"
+#    depends_on:
+#      - mongodb
+#      - ml-service
+#    environment:
+#      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/nail_design_db
+#      ML_SERVICE_URL: http://ml-service:8000
+#      SERVER_URL: http://192.168.1.8:8080
+#      ML_SERVICE_CONNECTION_TIMEOUT: 120000
+#      ML_SERVICE_READ_TIMEOUT: 120000
+#    volumes:
+#      - ./uploads:/app/uploads
+#
+#  mongodb:
+#    image: mongo:6
+#    ports:
+#      - "27017:27017"
+#    volumes:
+#      - mongo-data:/data/db
+
 services:
-  app:
+  api:
     build: .
     ports:
       - "8080:8080"
     depends_on:
-      - mongodb
       - ml-service
-    environment:
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/nail_design_db
-      ML_SERVICE_URL: http://ml-service:8000
-      SERVER_URL: http://192.168.1.8:8080
-      ML_SERVICE_CONNECTION_TIMEOUT: 120000
-      ML_SERVICE_READ_TIMEOUT: 120000
-    volumes:
-      - ./uploads:/app/uploads
+      - mongodb
+
+  ml-service:
+    build: ./ml-service         # ← укажи путь к ML-сервису
+    ports:
+      - "8000:8000"
 
   mongodb:
     image: mongo:6
@@ -21,31 +42,6 @@ services:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
-
-  mongo-client:
-    image: mongo:6
-    entrypoint: ["mongosh", "mongodb://mongodb:27017/nail_design_db"]
-    depends_on:
-      - mongodb
-
-  ml-service:
-    build:
-      context: ./ml-service
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./uploads:/app/uploads
-      - ./ml-service/designs:/app/designs
-    environment:
-      - MODEL_PATH=/app/models/best.pt
-      - DESIGNS_FOLDER=/app/designs
-      - PORT=8000
-      - API_BASE_URL=http://app:8080
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 2G
 
 volumes:
   mongo-data:
