@@ -10,6 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import aiofiles
 from processor import NailProcessor
+from pymongo import MongoClient
+
+mongo_client = MongoClient("mongodb://mongodb:27017/")
+db = mongo_client["nail_design_db"]
+designs_collection = db["design"]
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO,
@@ -52,12 +57,26 @@ if os.path.exists(default_model_path):
 
 # Функция для поиска дизайна по ID (можно адаптировать под ваши нужды)
 def find_design_file(design_id):
-    # Проверка прямого совпадения
+    # Попытка найти дизайн в MongoDB
+    try:
+        # Преобразуем строковый ID в ObjectId
+        from bson.objectid import ObjectId
+        design_doc = designs_collection.find_one({"_id": ObjectId(design_id)})
+
+        if design_doc and "imagePath" in design_doc:
+            image_path = os.path.join(DESIGNS_DIR, design_doc["imagePath"])
+            if os.path.exists(image_path):
+                logger.info(f"Найден файл дизайна {image_path} для ID {design_id}")
+                return image_path
+    except Exception as e:
+        logger.error(f"Ошибка при поиске дизайна в MongoDB: {str(e)}")
+
+    # Прямой поиск по имени файла, если MongoDB не помогла
     direct_match = os.path.join(DESIGNS_DIR, f"{design_id}.jpg")
     if os.path.exists(direct_match):
         return direct_match
 
-    # Если прямого совпадения нет, просто берем первый доступный файл дизайна
+    # Если все методы не сработали, берем первый доступный файл
     design_files = glob.glob(os.path.join(DESIGNS_DIR, "*.jpg"))
     if design_files:
         logger.info(f"Используем файл дизайна {design_files[0]} вместо ID {design_id}")
@@ -117,7 +136,8 @@ async def try_on_design(
         photo: UploadFile = File(...),
         designId: str = Form(...),
         threshold: float = Query(0.4, ge=0.1, le=0.9),
-        opacity: float = Query(0.9, ge=0.1, le=1.0)
+        opacity: float = Query(0.9, ge=0.1, le=1.0),
+        resize: bool = Query(True, description="Изменять ли размер изображения до 640x640")
 ):
     """
     Примерка дизайна ногтей на фотографию руки
@@ -126,6 +146,7 @@ async def try_on_design(
     - **designId**: ID дизайна для применения
     - **threshold**: Порог уверенности для детекции ногтей (0.1-0.9)
     - **opacity**: Непрозрачность наложения дизайна (0.1-1.0)
+    - **resize**: Изменять ли размер изображения до 640x640 (True/False)
     """
     global processor
 
@@ -162,7 +183,8 @@ async def try_on_design(
             "blur_radius": 17,
             "warp_method": "homography",
             "warp_strength": 0.8,
-            "shrink_factor": 0.8
+            "shrink_factor": 0.8,
+            "resize_images": resize  # Новый параметр
         }
 
         # Обработка изображений

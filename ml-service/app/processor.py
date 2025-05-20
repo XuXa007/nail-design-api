@@ -182,10 +182,11 @@ class NailProcessor:
                        blur_radius=17,
                        warp_method="homography",
                        warp_strength=0.8,
-                       shrink_factor=0.8):
+                       shrink_factor=0.8,
+                       resize_images=True):
         """
         Обработка изображения руки и наложение дизайна ногтей
-        
+
         Args:
             hand_image_path: Путь к изображению руки
             design_image_path: Путь к изображению дизайна
@@ -197,7 +198,8 @@ class NailProcessor:
             warp_method: Метод трансформации (homography, affine, thin_plate_spline)
             warp_strength: Сила деформации (0-1)
             shrink_factor: Сжатие исходных масок (0-1)
-            
+            resize_images: Изменять ли размер изображений до 640x640
+
         Returns:
             dict: Информация о результатах обработки
         """
@@ -212,9 +214,25 @@ class NailProcessor:
         if hand_img is None or design_img is None:
             raise ValueError("Не удалось загрузить одно или оба изображения")
 
-        # Получение масок для дизайна (окружности) и руки (обычные)
-        design_masks = self.get_sorted_masks(self.model(design_img)[0], conf_threshold_design, blur_radius, circle_only=True)
-        hand_masks = self.get_sorted_masks(self.model(hand_img)[0], conf_threshold_hand, blur_radius, circle_only=False)
+        # Сохраняем оригинальное изображение руки для финального результата
+        original_hand_img = hand_img.copy()
+
+        # Изменяем размер для обработки моделью YOLO, если нужно
+        if resize_images:
+            # Получаем размеры оригинального изображения
+            original_h, original_w = hand_img.shape[:2]
+
+            # Изменяем размер изображений для обработки моделью
+            hand_img_resized = self.resize_image(hand_img, (640, 640))
+            design_img_resized = self.resize_image(design_img, (640, 640))
+
+            # Получаем маски для дизайна (окружности) и руки (обычные)
+            design_masks = self.get_sorted_masks(self.model(design_img_resized)[0], conf_threshold_design, blur_radius, circle_only=True)
+            hand_masks = self.get_sorted_masks(self.model(hand_img_resized)[0], conf_threshold_hand, blur_radius, circle_only=False)
+        else:
+            # Используем оригинальные изображения
+            design_masks = self.get_sorted_masks(self.model(design_img)[0], conf_threshold_design, blur_radius, circle_only=True)
+            hand_masks = self.get_sorted_masks(self.model(hand_img)[0], conf_threshold_hand, blur_radius, circle_only=False)
 
         # Сохранение масок для отладки
         src_masks_path = os.path.join(output_dir, 'design_masks.png')
@@ -223,7 +241,11 @@ class NailProcessor:
         self.save_all_masks(hand_masks, dst_masks_path)
 
         # Перенос текстур
-        result = hand_img.copy()
+        if resize_images:
+            result = hand_img_resized.copy()
+        else:
+            result = hand_img.copy()
+
         num_hand_masks = len(hand_masks)
         num_design_masks = len(design_masks)
 
@@ -239,19 +261,23 @@ class NailProcessor:
                 design_idx = i if i < num_design_masks else random.randint(0, num_design_masks - 1)
 
                 result = self.warp_mask_content(
-                    design_img,          # исходное изображение (дизайн)
-                    design_masks[design_idx],  # маска дизайна
-                    result,              # текущий результат
-                    hand_masks[i],       # маска ногтя
+                    design_img_resized if resize_images else design_img,  # исходное изображение (дизайн)
+                    design_masks[design_idx],                             # маска дизайна
+                    result,                                               # текущий результат
+                    hand_masks[i],                                        # маска ногтя
                     alpha=alpha,
                     warp_method=warp_method,
                     warp_strength=warp_strength,
                     shrink_factor=shrink_factor
                 )
 
+        # Если исходное изображение было изменено для обработки,
+        # возвращаем результат также в размере 640x640
+        final_result = result
+
         # Сохранение результата
         result_path = os.path.join(output_dir, 'result.jpg')
-        cv2.imwrite(result_path, result)
+        cv2.imwrite(result_path, final_result)
 
         return {
             "result_path": result_path,
@@ -260,3 +286,46 @@ class NailProcessor:
             "num_design_masks": num_design_masks,
             "num_hand_masks": num_hand_masks
         }
+
+    def resize_image(self, image, target_size=(640, 640), preserve_aspect_ratio=True):
+        """
+        Изменяет размер изображения до целевого размера.
+
+        Args:
+            image: Исходное изображение
+            target_size: Целевой размер (ширина, высота)
+            preserve_aspect_ratio: Сохранять ли соотношение сторон
+
+        Returns:
+            Изображение измененного размера
+        """
+        if image is None:
+            return None
+
+        h, w = image.shape[:2]
+
+        if preserve_aspect_ratio:
+            # Вычисляем соотношение сторон
+            target_w, target_h = target_size
+            scale = min(target_w / w, target_h / h)
+
+            # Новые размеры с сохранением соотношения сторон
+            new_w, new_h = int(w * scale), int(h * scale)
+
+            # Изменяем размер с сохранением соотношения сторон
+            resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+            # Создаем пустое изображение нужного размера
+            result = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+
+            # Вычисляем смещение для центрирования
+            offset_x = (target_w - new_w) // 2
+            offset_y = (target_h - new_h) // 2
+
+            # Помещаем изображение в центр
+            result[offset_y:offset_y+new_h, offset_x:offset_x+new_w] = resized
+
+            return result
+        else:
+            # Просто изменяем размер без сохранения соотношения сторон
+            return cv2.resize(image, target_size, interpolation=cv2.INTER_AREA)

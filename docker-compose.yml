@@ -20,6 +20,8 @@ services:
       - ./ml-service/app/uploads:/app/uploads
       - ./ml-service/app/designs:/app/designs
       - ./ml-service/app/results:/app/results
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/nail_design_db
 
   mongodb:
     image: mongo:6
@@ -30,3 +32,4 @@ services:
 
 volumes:
   mongo-data:
+
