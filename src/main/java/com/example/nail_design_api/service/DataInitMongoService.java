@@ -37,12 +37,29 @@ public class DataInitMongoService implements CommandLineRunner {
         mongo.dropCollection(Design.class);
 
         List<Design> designs = List.of(
-                new Design(null, "French Manicure",       "Классический френч",    List.of("white","pink"),   "French",  "Everyday", "Medium", "Gel",     "french.jpg",         "french_thumb.jpg"),
-                new Design(null, "Glitter Ombre",         "Блестящий омбре",       List.of("pink","purple"),  "Ombre",   "Party",    "Long",   "Acrylic", "glitter.jpg",        "glitter_thumb.jpg"),
-                new Design(null, "Geometric Minimalism",  "Геометрический дизайн", List.of("blue","white"),   "Minimal", "Spring",   "Medium", "Gel",     "geometric.jpg",      "geometric_thumb.jpg"),
-                new Design(null, "Floral Accent",         "Цветочный акцент",      List.of("pink","green"),   "Floral",  "Summer",   "Long",   "Gel",     "floral.jpg",         "floral_thumb.jpg"),
-                new Design(null, "Matte Black",           "Матовый чёрный",        List.of("gray","red"),     "Matte",   "Winter",   "Short",  "Acrylic", "matte.jpg",          "matte_thumb.jpg")
+                new Design(null, "Classic Red", "Классический красный маникюр", List.of("red"), "Classic", "Autumn",
+                        "Short", "Gel", "simple_red.jpg", "simple_red_thumb.jpg"),
+
+                new Design(null, "Vibrant Fuchsia", "Яркий фуксия цвет", List.of("fuchsia"), "Bold", "Party",
+                        "Medium", "Acrylic", "photo_2025-05-20 18.29.22.jpg", "photo_2025-05-20 18.29.22_thumb.jpg"),
+
+                new Design(null, "Soft Lavender", "Нежный лавандовый маникюр", List.of("purple"), "Pastel", "Spring",
+                        "Short", "Gel", "simple_violet.jpg", "simple_violet_thumb.jpg"),
+
+                new Design(null, "Olive Touch", "Оливковый маникюр на каждый день", List.of("olive"), "Matte", "Winter",
+                        "Short", "Gel", "simple_grey_green.jpg", "simple_grey_green_thumb.jpg"),
+
+                new Design(null, "Mint Fresh", "Свежий мятный оттенок", List.of("mint"), "Pastel", "Spring",
+                        "Short", "Gel", "simple_green.jpg", "simple_green_thumb.jpg"),
+
+                new Design(null, "Natural Nude", "Нюдовый натуральный маникюр", List.of("nude"), "Nude", "Everyday",
+                        "Medium", "Gel", "simple.jpg", "simple_thumb.jpg"),
+
+                new Design(null, "Deep Burgundy", "Глубокий бордовый цвет", List.of("burgundy"), "Dark", "Winter",
+                        "Medium", "Gel", "simple_wien.jpg", "simple_wien_thumb.jpg")
         );
+
+
 
         repo.saveAll(designs);
         System.out.println("✅ Saved designs count: " + repo.count());
