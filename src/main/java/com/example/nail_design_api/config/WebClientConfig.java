@@ -15,20 +15,11 @@ import java.time.Duration;
 @Configuration
 public class WebClientConfig {
 
-    @Value("${ml-service.connection-timeout:60000}")
-    private int connectionTimeout;
-
-    @Value("${ml-service.read-timeout:60000}")
-    private int readTimeout;
-
     @Bean
     public RestTemplate restTemplate() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-
-        // Устанавливаем увеличенные таймауты для работы с ML сервисом,
-        // так как обработка изображений может занимать время
-        factory.setConnectTimeout(connectionTimeout);
-        factory.setReadTimeout(readTimeout);
+        factory.setConnectTimeout(15000); // 15 секунд на подключение
+        factory.setReadTimeout(30000);    // 30 секунд на чтение
 
         return new RestTemplate(factory);
     }

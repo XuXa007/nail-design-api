@@ -1,27 +1,3 @@
-#services:
-#  app:
-#    build: .
-#    ports:
-#      - "8080:8080"
-#    depends_on:
-#      - mongodb
-#      - ml-service
-#    environment:
-#      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/nail_design_db
-#      ML_SERVICE_URL: http://ml-service:8000
-#      SERVER_URL: http://192.168.1.8:8080
-#      ML_SERVICE_CONNECTION_TIMEOUT: 120000
-#      ML_SERVICE_READ_TIMEOUT: 120000
-#    volumes:
-#      - ./uploads:/app/uploads
-#
-#  mongodb:
-#    image: mongo:6
-#    ports:
-#      - "27017:27017"
-#    volumes:
-#      - mongo-data:/data/db
-
 services:
   api:
     build: .
@@ -30,11 +6,20 @@ services:
     depends_on:
       - ml-service
       - mongodb
+    environment:
+      - ML_SERVICE_URL=http://ml-service:8000
+      - MONGODB_URI=mongodb://mongodb:27017/nail_design
 
   ml-service:
-    build: ./ml-service         # ← укажи путь к ML-сервису
+    build:
+      context: ./ml-service/
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    volumes:
+      - ./ml-service/app/uploads:/app/uploads
+      - ./ml-service/app/designs:/app/designs
+      - ./ml-service/app/results:/app/results
 
   mongodb:
     image: mongo:6

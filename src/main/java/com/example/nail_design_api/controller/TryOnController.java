@@ -1,11 +1,9 @@
 package com.example.nail_design_api.controller;
 
-import com.example.nail_design_api.dto.TryOnRequest;
 import com.example.nail_design_api.service.TryOnService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -13,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.logging.Logger;
 
 @RestController
@@ -51,14 +48,13 @@ public class TryOnController {
             logger.info("Получен запрос на примерку дизайна: designId=" + designId
                     + ", threshold=" + threshold + ", opacity=" + opacity);
 
-            // Проверяем параметры
-            if (photo.isEmpty()) {
-                logger.warning("Получено пустое изображение");
+            // Валидация запроса через сервис
+            if (!tryOnService.processTryOnRequest(photo, designId)) {
                 return ResponseEntity.badRequest().build();
             }
 
             // Формируем URL для ML сервиса
-            String url = mlServiceUrl + "/api/tryon?threshold=" + threshold + "&opacity=" + opacity;
+            String url = mlServiceUrl + "/api/tryon";
 
             // Подготавливаем multipart/form-data для отправки
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
@@ -71,8 +67,9 @@ public class TryOnController {
                 }
             };
             body.add("photo", photoResource);
-
             body.add("designId", designId);
+            body.add("threshold", String.valueOf(threshold));
+            body.add("opacity", String.valueOf(opacity));
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
