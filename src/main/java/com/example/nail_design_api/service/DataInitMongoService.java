@@ -7,11 +7,13 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
 
 import java.util.List;
 
 @Profile("!test")
 @Component
+@Order(2) // Запускается после DemoUserInitService
 public class DataInitMongoService implements CommandLineRunner {
 
     private final DesignRepository repo;
