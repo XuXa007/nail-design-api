@@ -17,12 +17,14 @@ public class Design {
     private String material;
     private String imagePath;
     private String thumbnailPath;
+    private String createdBy;
+    private String salonName;
 
     public Design() {}
 
     public Design(String id, String name, String description, List<String> colors,
-                  String designType, String occasion, String length,
-                  String material, String imagePath, String thumbnailPath) {
+                  String designType, String occasion, String length, String material,
+                  String imagePath, String thumbnailPath) {
         this.id = id;
         this.name = name;
         this.description = description;
@@ -33,6 +35,25 @@ public class Design {
         this.material = material;
         this.imagePath = imagePath;
         this.thumbnailPath = thumbnailPath;
+        this.createdBy = null;
+        this.salonName = null;
+    }
+
+    public Design(String id, String name, String description, List<String> colors, String designType,
+                  String occasion, String length, String material, String imagePath, String thumbnailPath,
+                  String createdBy, String salonName) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.colors = colors;
+        this.designType = designType;
+        this.occasion = occasion;
+        this.length = length;
+        this.material = material;
+        this.imagePath = imagePath;
+        this.thumbnailPath = thumbnailPath;
+        this.createdBy = createdBy;
+        this.salonName = salonName;
     }
 
     public String getId() {
@@ -113,5 +134,21 @@ public class Design {
 
     public void setThumbnailPath(String thumbnailPath) {
         this.thumbnailPath = thumbnailPath;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public String getSalonName() {
+        return salonName;
+    }
+
+    public void setSalonName(String salonName) {
+        this.salonName = salonName;
     }
 }

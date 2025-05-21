@@ -21,9 +21,12 @@ import java.util.stream.Collectors;
 @Service
 public class DesignService {
 
-    @Autowired private DesignRepository designRepository;
-    @Value("${upload.path}") private String uploadPath;
-    @Value("${server.url}") private String serverUrl;
+    @Autowired
+    private DesignRepository designRepository;
+    @Value("${upload.path}")
+    private String uploadPath;
+    @Value("${server.url}")
+    private String serverUrl;
 
     public List<DesignDTO> getAllDesigns() {
         return convertToDTOList(designRepository.findAll());
@@ -52,7 +55,6 @@ public class DesignService {
                     .filter(d -> d.getColors().contains(color))
                     .collect(Collectors.toList());
         }
-        // … аналогично для occasion, length, material ????
 
         return convertToDTOList(list);
     }
@@ -61,8 +63,9 @@ public class DesignService {
             String name, String description,
             String designType, String color, String occasion,
             String length, String material,
-            MultipartFile image
-    ) throws IOException {
+            MultipartFile image,
+            String createdBy, String salonName) throws IOException {
+
         String uuid = UUID.randomUUID().toString();
         String uniqueFileName = uuid + "_" + image.getOriginalFilename();
         String thumbnailFileName = "thumb_" + uniqueFileName;
@@ -84,6 +87,8 @@ public class DesignService {
         design.setMaterial(material);
         design.setImagePath(uniqueFileName);
         design.setThumbnailPath(thumbnailFileName);
+        design.setCreatedBy(createdBy);
+        design.setSalonName(salonName);
 
         design = designRepository.save(design);
         return convertToDTO(design);
@@ -99,13 +104,40 @@ public class DesignService {
         dto.setOccasion(d.getOccasion());
         dto.setLength(d.getLength());
         dto.setMaterial(d.getMaterial());
+        dto.setCreatedBy(d.getCreatedBy());
+        dto.setSalonName(d.getSalonName());
 
         String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
         dto.setImagePath(base + "/uploads/" + d.getImagePath());
         dto.setThumbnailPath(base + "/uploads/" + d.getThumbnailPath());
-
         return dto;
     }
+
+    public List<DesignDTO> getDesignsByCreator(String username) {
+        List<Design> designs = designRepository.findByCreatedBy(username);
+        return convertToDTOList(designs);
+    }
+
+    public DesignDTO updateDesign(DesignDTO designDTO) {
+        Design design = designRepository.findById(designDTO.getId())
+                .orElseThrow(() -> new RuntimeException("Design not found"));
+
+        design.setName(designDTO.getName());
+        design.setDescription(designDTO.getDescription());
+        design.setColors(designDTO.getColors());
+        design.setDesignType(designDTO.getDesignType());
+        design.setOccasion(designDTO.getOccasion());
+        design.setLength(designDTO.getLength());
+        design.setMaterial(designDTO.getMaterial());
+
+        design = designRepository.save(design);
+        return convertToDTO(design);
+    }
+
+    public void deleteDesign(String id) {
+        designRepository.deleteById(id);
+    }
+
 
     private List<DesignDTO> convertToDTOList(List<Design> list) {
         return list.stream().map(this::convertToDTO).toList();

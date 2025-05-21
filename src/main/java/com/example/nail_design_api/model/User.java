@@ -12,7 +12,48 @@ public class User {
     private String username;
     private String password;
     private String email;
+    private UserRole role;
+    private String salonName;
+    private String address;
     private Set<String> favoriteDesignIds = new HashSet<>();
+    private Set<String> createdDesignIds = new HashSet<>();
+
+    public enum UserRole {
+        CLIENT,
+        MASTER
+    }
+
+    public UserRole getRole() {
+        return role;
+    }
+
+    public void setRole(UserRole role) {
+        this.role = role;
+    }
+
+    public String getSalonName() {
+        return salonName;
+    }
+
+    public void setSalonName(String salonName) {
+        this.salonName = salonName;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public Set<String> getCreatedDesignIds() {
+        return createdDesignIds;
+    }
+
+    public void setCreatedDesignIds(Set<String> createdDesignIds) {
+        this.createdDesignIds = createdDesignIds;
+    }
 
     public String getId() {
         return id;

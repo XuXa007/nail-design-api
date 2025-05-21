@@ -13,6 +13,9 @@ public class DesignDTO {
     private String material;
     private String imagePath;
     private String thumbnailPath;
+    private String createdBy;
+    private String salonName;
+
     public String getId() {
         return id;
     }
@@ -91,5 +94,21 @@ public class DesignDTO {
 
     public void setThumbnailPath(String thumbnailPath) {
         this.thumbnailPath = thumbnailPath;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public String getSalonName() {
+        return salonName;
+    }
+
+    public void setSalonName(String salonName) {
+        this.salonName = salonName;
     }
 }
