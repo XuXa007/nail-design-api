@@ -137,7 +137,10 @@ async def try_on_design(
         designId: str = Form(...),
         threshold: float = Query(0.4, ge=0.1, le=0.9),
         opacity: float = Query(0.9, ge=0.1, le=1.0),
-        resize: bool = Query(True, description="Изменять ли размер изображения до 640x640")
+        resize: bool = Query(True, description="Изменять ли размер изображения до 640x640"),
+        edge_effect: str = Query("blur", description="Эффект для краев ногтей (fade, darken, lighten, blur, none)"),
+        edge_size: int = Query(8, ge=0, le=20, description="Размер эффекта края в пикселях"),
+        shrink_factor: float = Query(0.05, ge=0.0, le=0.2, description="Сжатие маски ногтя")
 ):
     """
     Примерка дизайна ногтей на фотографию руки
@@ -146,7 +149,10 @@ async def try_on_design(
     - **designId**: ID дизайна для применения
     - **threshold**: Порог уверенности для детекции ногтей (0.1-0.9)
     - **opacity**: Непрозрачность наложения дизайна (0.1-1.0)
-    - **resize**: Изменять ли размер изображения до 640x640 (True/False)
+    - **resize**: Изменять ли размер изображения до 640x640
+    - **edge_effect**: Эффект для краев ногтей (fade, darken, lighten, blur, none)
+    - **edge_size**: Размер эффекта края в пикселях (0-20)
+    - **shrink_factor**: Сжатие маски ногтя (0.0-0.2)
     """
     global processor
 
@@ -183,8 +189,10 @@ async def try_on_design(
             "blur_radius": 17,
             "warp_method": "homography",
             "warp_strength": 0.8,
-            "shrink_factor": 0.8,
-            "resize_images": resize  # Новый параметр
+            "shrink_factor": shrink_factor,  # Используем пользовательское значение
+            "resize_images": resize,
+            "edge_effect": None if edge_effect.lower() == "none" else edge_effect.lower(),
+            "edge_size": edge_size
         }
 
         # Обработка изображений

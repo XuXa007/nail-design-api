@@ -116,176 +116,72 @@ class NailProcessor:
             combined_mask[mask > 0] = colors[i % len(colors)]
         cv2.imwrite(filename, combined_mask)
 
-    def warp_mask_content(self,
-                          src_img,
-                          src_mask,
-                          dst_img,
-                          dst_mask,
-                          alpha=1.0,
-                          warp_method="homography",
-                          warp_strength=0.5,
-                          shrink_factor=0.0
-                          ):
-        """Перенос текстуры с возможностью сжатия исходной маски."""
-        if shrink_factor > 0:
-            src_mask = self.apply_shrink_to_mask(src_mask, shrink_factor)
-
-        src_contours, _ = cv2.findContours(src_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        dst_contours, _ = cv2.findContours(dst_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if len(src_contours) == 0 or len(dst_contours) == 0:
-            return dst_img
-
-        n_points = max(10, int(50 * warp_strength))
-
-        def resample(contour, points=n_points):
-            contour = contour.squeeze()
-            if len(contour) == points:
-                return contour
-            old_lengths = np.linspace(0, 1, len(contour))
-            new_lengths = np.linspace(0, 1, points)
-            return np.array([np.interp(new_lengths, old_lengths, contour[:, i]) for i in [0, 1]]).T.reshape(-1, 1, 2)
-
-        src_pts = resample(src_contours[0].astype(np.float32))
-        dst_pts = resample(dst_contours[0].astype(np.float32))
-
-        if warp_method == "homography":
-            H, _ = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC)
-            warped = cv2.warpPerspective(src_img, H, (dst_img.shape[1], dst_img.shape[0]))
-
-        elif warp_method == "affine":
-            M = cv2.estimateAffine2D(src_pts, dst_pts, method=cv2.RANSAC)[0]
-            warped = cv2.warpAffine(src_img, M, (dst_img.shape[1], dst_img.shape[0]))
-
-        elif warp_method == "thin_plate_spline":
-            if len(src_pts) < 3:
-                raise ValueError("Для TPS нужно минимум 3 точки")
-            grid_size = max(10, int(30 * warp_strength))
-            tps = RBFInterpolator(src_pts.squeeze(), dst_pts.squeeze(), kernel='thin_plate_spline')
-            h, w = dst_img.shape[:2]
-            grid_x, grid_y = np.meshgrid(np.linspace(0, w - 1, grid_size), np.linspace(0, h - 1, grid_size))
-            remapped = tps(np.stack([grid_x.ravel(), grid_y.ravel()], axis=-1))
-            remapped = remapped.reshape(grid_size, grid_size, 2)
-            remapped = cv2.resize(remapped, (w, h), interpolation=cv2.INTER_LINEAR)
-            warped = cv2.remap(src_img, remapped.astype(np.float32), None, cv2.INTER_LINEAR)
-
-        mask_expanded = np.expand_dims(dst_mask, axis=-1)
-        blended = (warped * alpha + dst_img * (1 - alpha)) * mask_expanded
-        return (dst_img * (1 - mask_expanded) + blended).astype(np.uint8)
-
-    def process_images(self,
-                       hand_image_path,
-                       design_image_path,
-                       output_dir,
-                       conf_threshold_hand=0.4,
-                       conf_threshold_design=0.4,
-                       alpha=0.9,
-                       blur_radius=17,
-                       warp_method="homography",
-                       warp_strength=0.8,
-                       shrink_factor=0.8,
-                       resize_images=True):
+    def apply_edge_effect(self, mask, effect_type="fade", edge_size=5):
         """
-        Обработка изображения руки и наложение дизайна ногтей
+        Применяет эффект к краям маски с улучшенным контролем границ.
 
         Args:
-            hand_image_path: Путь к изображению руки
-            design_image_path: Путь к изображению дизайна
-            output_dir: Директория для сохранения результатов
-            conf_threshold_hand: Порог уверенности для обнаружения ногтей на руке
-            conf_threshold_design: Порог уверенности для обнаружения дизайна
-            alpha: Непрозрачность наложения дизайна
-            blur_radius: Радиус размытия краёв масок
-            warp_method: Метод трансформации (homography, affine, thin_plate_spline)
-            warp_strength: Сила деформации (0-1)
-            shrink_factor: Сжатие исходных масок (0-1)
-            resize_images: Изменять ли размер изображений до 640x640
+            mask: Бинарная маска ногтя
+            effect_type: Тип эффекта - "fade" (градиент прозрачности),
+                                      "darken" (затемнение),
+                                      "lighten" (осветление),
+                                      "blur" (размытие краев)
+            edge_size: Размер эффекта края в пикселях
 
         Returns:
-            dict: Информация о результатах обработки
+            Модифицированная маска с эффектом краев
         """
-        if self.model is None:
-            logger.error("Модель YOLO не загружена")
-            raise ValueError("Модель YOLO не загружена")
+        if edge_size <= 0 or mask is None:
+            return mask
 
-        # Загрузка изображений
-        hand_img = cv2.imread(hand_image_path)
-        design_img = cv2.imread(design_image_path)
+        # Сначала улучшаем контур с помощью морфологических операций
+        kernel = np.ones((3, 3), np.uint8)
+        mask_eroded = cv2.erode(mask.astype(np.uint8), kernel, iterations=1)
+        mask_difference = mask.astype(np.uint8) - mask_eroded
 
-        if hand_img is None or design_img is None:
-            raise ValueError("Не удалось загрузить одно или оба изображения")
+        # Создаем копию маски для работы
+        mask_copy = mask.copy().astype(np.float32)
 
-        # Сохраняем оригинальное изображение руки для финального результата
-        original_hand_img = hand_img.copy()
+        # Создаем градиент от края к центру
+        distance_transform = cv2.distanceTransform(mask_eroded, cv2.DIST_L2, 5)
+        max_distance = np.max(distance_transform)
+        if max_distance > 0:
+            # Нормализуем расстояние
+            distance_normalized = distance_transform / max_distance
 
-        # Изменяем размер для обработки моделью YOLO, если нужно
-        if resize_images:
-            # Получаем размеры оригинального изображения
-            original_h, original_w = hand_img.shape[:2]
+            # Создаем маску краев на основе расстояния
+            edge_mask = np.ones_like(distance_normalized)
+            edge_mask[distance_normalized > edge_size / max_distance] = 0
 
-            # Изменяем размер изображений для обработки моделью
-            hand_img_resized = self.resize_image(hand_img, (640, 640))
-            design_img_resized = self.resize_image(design_img, (640, 640))
+            # Смягчаем переход
+            edge_mask = cv2.GaussianBlur(edge_mask, (edge_size*2+1, edge_size*2+1), 0)
 
-            # Получаем маски для дизайна (окружности) и руки (обычные)
-            design_masks = self.get_sorted_masks(self.model(design_img_resized)[0], conf_threshold_design, blur_radius, circle_only=True)
-            hand_masks = self.get_sorted_masks(self.model(hand_img_resized)[0], conf_threshold_hand, blur_radius, circle_only=False)
-        else:
-            # Используем оригинальные изображения
-            design_masks = self.get_sorted_masks(self.model(design_img)[0], conf_threshold_design, blur_radius, circle_only=True)
-            hand_masks = self.get_sorted_masks(self.model(hand_img)[0], conf_threshold_hand, blur_radius, circle_only=False)
+            # Применяем эффект в зависимости от типа
+            if effect_type == "fade":
+                # Градиент прозрачности с более плавным переходом
+                alpha = 1.0 - edge_mask * 0.9
+                mask_copy = mask_copy * alpha
 
-        # Сохранение масок для отладки
-        src_masks_path = os.path.join(output_dir, 'design_masks.png')
-        dst_masks_path = os.path.join(output_dir, 'hand_masks.png')
-        self.save_all_masks(design_masks, src_masks_path)
-        self.save_all_masks(hand_masks, dst_masks_path)
+            elif effect_type == "darken":
+                # Затемнение краев с более естественным переходом
+                darkness = 1.0 - edge_mask * 0.7
+                mask_copy = mask_copy * darkness
 
-        # Перенос текстур
-        if resize_images:
-            result = hand_img_resized.copy()
-        else:
-            result = hand_img.copy()
+            elif effect_type == "lighten":
+                # Осветление краев (уменьшение интенсивности маски)
+                lightness = 1.0 - edge_mask * 0.5
+                mask_copy = mask_copy * lightness
 
-        num_hand_masks = len(hand_masks)
-        num_design_masks = len(design_masks)
+            elif effect_type == "blur":
+                # Просто размытие краев для более плавного перехода
+                blur_factor = 1.0 - edge_mask * 0.95
+                mask_blurred = cv2.GaussianBlur(mask.astype(np.float32), (edge_size*2+1, edge_size*2+1), 0)
+                mask_copy = mask_copy * (1.0 - edge_mask) + mask_blurred * edge_mask
 
-        if num_hand_masks == 0:
-            logger.warning("Не найдено ногтей на изображении руки")
-            raise ValueError("Не найдено ногтей на изображении руки")
-        elif num_design_masks == 0:
-            logger.warning("Не найдено дизайнов на изображении")
-            raise ValueError("Не найдено дизайнов на изображении")
-        else:
-            for i in range(num_hand_masks):
-                # Выбираем дизайн для каждого ногтя
-                design_idx = i if i < num_design_masks else random.randint(0, num_design_masks - 1)
+        # Дополнительное сглаживание для устранения резких переходов
+        mask_copy = cv2.GaussianBlur(mask_copy, (3, 3), 0)
 
-                result = self.warp_mask_content(
-                    design_img_resized if resize_images else design_img,  # исходное изображение (дизайн)
-                    design_masks[design_idx],                             # маска дизайна
-                    result,                                               # текущий результат
-                    hand_masks[i],                                        # маска ногтя
-                    alpha=alpha,
-                    warp_method=warp_method,
-                    warp_strength=warp_strength,
-                    shrink_factor=shrink_factor
-                )
-
-        # Если исходное изображение было изменено для обработки,
-        # возвращаем результат также в размере 640x640
-        final_result = result
-
-        # Сохранение результата
-        result_path = os.path.join(output_dir, 'result.jpg')
-        cv2.imwrite(result_path, final_result)
-
-        return {
-            "result_path": result_path,
-            "src_masks_path": src_masks_path,
-            "dst_masks_path": dst_masks_path,
-            "num_design_masks": num_design_masks,
-            "num_hand_masks": num_hand_masks
-        }
+        return mask_copy
 
     def resize_image(self, image, target_size=(640, 640), preserve_aspect_ratio=True):
         """
@@ -329,3 +225,195 @@ class NailProcessor:
         else:
             # Просто изменяем размер без сохранения соотношения сторон
             return cv2.resize(image, target_size, interpolation=cv2.INTER_AREA)
+
+    def warp_mask_content(self,
+                          src_img,
+                          src_mask,
+                          dst_img,
+                          dst_mask,
+                          alpha=1.0,
+                          warp_method="homography",
+                          warp_strength=0.5,
+                          shrink_factor=0.0,
+                          edge_effect="fade",
+                          edge_size=5
+                          ):
+        """Перенос текстуры с возможностью сжатия исходной маски и эффектами контура."""
+        if shrink_factor > 0:
+            src_mask = self.apply_shrink_to_mask(src_mask, shrink_factor)
+
+        # Применяем эффект к контуру маски ногтя
+        if edge_effect and edge_size > 0:
+            dst_mask_with_effect = self.apply_edge_effect(dst_mask, effect_type=edge_effect, edge_size=edge_size)
+        else:
+            dst_mask_with_effect = dst_mask
+
+        src_contours, _ = cv2.findContours(src_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        dst_contours, _ = cv2.findContours(dst_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if len(src_contours) == 0 or len(dst_contours) == 0:
+            return dst_img
+
+        n_points = max(10, int(50 * warp_strength))
+
+        # Определяем функцию resample внутри метода warp_mask_content
+        def resample(contour, points):
+            contour = contour.squeeze()
+            if len(contour) == points:
+                return contour
+            old_lengths = np.linspace(0, 1, len(contour))
+            new_lengths = np.linspace(0, 1, points)
+            return np.array([np.interp(new_lengths, old_lengths, contour[:, i]) for i in [0, 1]]).T.reshape(-1, 1, 2)
+
+        src_pts = resample(src_contours[0].astype(np.float32), n_points)
+        dst_pts = resample(dst_contours[0].astype(np.float32), n_points)
+
+        if warp_method == "homography":
+            H, _ = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC)
+            warped = cv2.warpPerspective(src_img, H, (dst_img.shape[1], dst_img.shape[0]))
+
+        elif warp_method == "affine":
+            M = cv2.estimateAffine2D(src_pts, dst_pts, method=cv2.RANSAC)[0]
+            warped = cv2.warpAffine(src_img, M, (dst_img.shape[1], dst_img.shape[0]))
+
+        elif warp_method == "thin_plate_spline":
+            if len(src_pts) < 3:
+                raise ValueError("Для TPS нужно минимум 3 точки")
+            grid_size = max(10, int(30 * warp_strength))
+            tps = RBFInterpolator(src_pts.squeeze(), dst_pts.squeeze(), kernel='thin_plate_spline')
+            h, w = dst_img.shape[:2]
+            grid_x, grid_y = np.meshgrid(np.linspace(0, w - 1, grid_size), np.linspace(0, h - 1, grid_size))
+            remapped = tps(np.stack([grid_x.ravel(), grid_y.ravel()], axis=-1))
+            remapped = remapped.reshape(grid_size, grid_size, 2)
+            remapped = cv2.resize(remapped, (w, h), interpolation=cv2.INTER_LINEAR)
+            warped = cv2.remap(src_img, remapped.astype(np.float32), None, cv2.INTER_LINEAR)
+
+        # Используем маску с эффектом для наложения
+        mask_expanded = np.expand_dims(dst_mask_with_effect, axis=-1)
+        blended = (warped * alpha + dst_img * (1 - alpha)) * mask_expanded
+        return (dst_img * (1 - mask_expanded) + blended).astype(np.uint8)
+
+    def process_images(self,
+                       hand_image_path,
+                       design_image_path,
+                       output_dir,
+                       conf_threshold_hand=0.4,
+                       conf_threshold_design=0.4,
+                       alpha=0.9,
+                       blur_radius=17,
+                       warp_method="homography",
+                       warp_strength=0.8,
+                       shrink_factor=0.8,
+                       edge_effect="fade",
+                       edge_size=5,
+                       resize_images=True):
+        """
+        Обработка изображения руки и наложение дизайна ногтей
+
+        Args:
+            hand_image_path: Путь к изображению руки
+            design_image_path: Путь к изображению дизайна
+            output_dir: Директория для сохранения результатов
+            conf_threshold_hand: Порог уверенности для обнаружения ногтей на руке
+            conf_threshold_design: Порог уверенности для обнаружения дизайна
+            alpha: Непрозрачность наложения дизайна
+            blur_radius: Радиус размытия краёв масок
+            warp_method: Метод трансформации (homography, affine, thin_plate_spline)
+            warp_strength: Сила деформации (0-1)
+            shrink_factor: Сжатие исходных масок (0-1)
+            edge_effect: Эффект для краев ("fade", "darken", "lighten", "blur" или None)
+            edge_size: Размер эффекта края в пикселях
+            resize_images: Изменять ли размер изображений до 640x640
+
+        Returns:
+            dict: Информация о результатах обработки
+        """
+        if self.model is None:
+            logger.error("Модель YOLO не загружена")
+            raise ValueError("Модель YOLO не загружена")
+
+        # Загрузка изображений
+        hand_img = cv2.imread(hand_image_path)
+        design_img = cv2.imread(design_image_path)
+
+        if hand_img is None or design_img is None:
+            raise ValueError("Не удалось загрузить одно или оба изображения")
+
+        # Сохраняем оригинальное изображение руки для финального результата
+        original_hand_img = hand_img.copy()
+
+        # Изменяем размер для обработки моделью YOLO, если нужно
+        if resize_images:
+            # Изменяем размер изображений для обработки моделью
+            hand_img_resized = self.resize_image(hand_img, (640, 640))
+            design_img_resized = self.resize_image(design_img, (640, 640))
+
+            # Получаем маски для дизайна (окружности) и руки (обычные)
+            design_masks = self.get_sorted_masks(self.model(design_img_resized)[0], conf_threshold_design, blur_radius, circle_only=True)
+            hand_masks = self.get_sorted_masks(self.model(hand_img_resized)[0], conf_threshold_hand, blur_radius, circle_only=False)
+        else:
+            # Используем оригинальные изображения
+            design_masks = self.get_sorted_masks(self.model(design_img)[0], conf_threshold_design, blur_radius, circle_only=True)
+            hand_masks = self.get_sorted_masks(self.model(hand_img)[0], conf_threshold_hand, blur_radius, circle_only=False)
+
+        # Улучшаем маски ногтей дополнительной обработкой
+        if len(hand_masks) > 0:
+            for i in range(len(hand_masks)):
+                # Применяем морфологические операции для улучшения маски
+                kernel = np.ones((3, 3), np.uint8)
+                # Закрытие для заполнения малых дырок
+                hand_masks[i] = cv2.morphologyEx(hand_masks[i].astype(np.uint8), cv2.MORPH_CLOSE, kernel)
+                # Открытие для удаления мелких шумов
+                hand_masks[i] = cv2.morphologyEx(hand_masks[i], cv2.MORPH_OPEN, kernel)
+                # Сглаживание контуров
+                hand_masks[i] = cv2.GaussianBlur(hand_masks[i].astype(np.float32), (5, 5), 0) > 0.5
+
+        # Сохранение масок для отладки
+        src_masks_path = os.path.join(output_dir, 'design_masks.png')
+        dst_masks_path = os.path.join(output_dir, 'hand_masks.png')
+        self.save_all_masks(design_masks, src_masks_path)
+        self.save_all_masks(hand_masks, dst_masks_path)
+
+        # Перенос текстур
+        if resize_images:
+            result = hand_img_resized.copy()
+        else:
+            result = hand_img.copy()
+
+        num_hand_masks = len(hand_masks)
+        num_design_masks = len(design_masks)
+
+        if num_hand_masks == 0:
+            logger.warning("Не найдено ногтей на изображении руки")
+            raise ValueError("Не найдено ногтей на изображении руки")
+        elif num_design_masks == 0:
+            logger.warning("Не найдено дизайнов на изображении")
+            raise ValueError("Не найдено дизайнов на изображении")
+        else:
+            for i in range(num_hand_masks):
+                # Выбираем дизайн для каждого ногтя
+                design_idx = i if i < num_design_masks else random.randint(0, num_design_masks - 1)
+
+                result = self.warp_mask_content(
+                    design_img_resized if resize_images else design_img,  # исходное изображение (дизайн)
+                    design_masks[design_idx],                             # маска дизайна
+                    result,                                               # текущий результат
+                    hand_masks[i],                                        # маска ногтя
+                    alpha=alpha,
+                    warp_method=warp_method,
+                    warp_strength=warp_strength,
+                    shrink_factor=shrink_factor,
+                    edge_effect=edge_effect,
+                    edge_size=edge_size
+                )
+
+        # Сохранение результата
+        result_path = os.path.join(output_dir, 'result.jpg')
+        cv2.imwrite(result_path, result)
+
+        return {
+            "result_path": result_path,
+            "src_masks_path": src_masks_path,
+            "dst_masks_path": dst_masks_path,
+            "num_design_masks": num_design_masks,
+            "num_hand_masks": num_hand_masks
+        }
