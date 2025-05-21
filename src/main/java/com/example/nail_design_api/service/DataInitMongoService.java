@@ -43,7 +43,7 @@ public class DataInitMongoService implements CommandLineRunner {
 
                 new Design(null, "Vibrant Fuchsia", "Яркий фуксия цвет с блестками",
                         List.of("fuchsia"), "bold", "party", "glitter", "acrylic",
-                        "photo_2025-05-20 18.29.22.jpg", "photo_2025-05-20 18.29.22_thumb.jpg"),
+                        "simple_pink.jpg", "simple_pink_thumb.jpg"),
 
                 new Design(null, "Soft Lavender", "Нежный лавандовый френч маникюр",
                         List.of("purple"), "pastel", "spring", "french", "gel",
