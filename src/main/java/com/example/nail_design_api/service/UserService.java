@@ -41,7 +41,11 @@ public class UserService {
 
     public User findByUsername(String username) {
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+                .orElse(null);
+    }
+
+    public boolean existsByUsername(String username) {
+        return userRepository.findByUsername(username).isPresent();
     }
 
     public User saveUser(User user) {

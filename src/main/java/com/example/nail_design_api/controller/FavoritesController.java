@@ -3,6 +3,8 @@ package com.example.nail_design_api.controller;
 import com.example.nail_design_api.dto.DesignDTO;
 import com.example.nail_design_api.service.FavoritesService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 
@@ -11,46 +13,51 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/auth/favorites")
 public class FavoritesController {
-    private static final String DEFAULT_USER = "demo_client";
 
     @Autowired
     private FavoritesService favoritesService;
 
     @GetMapping
-    public ResponseEntity<List<DesignDTO>> getFavorites(@RequestParam(required = false) String username) {
-        String user = username != null ? username : DEFAULT_USER;
+    public ResponseEntity<List<DesignDTO>> getFavorites() {
         try {
-            List<DesignDTO> favorites = favoritesService.getFavorites(user);
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+
+            List<DesignDTO> favorites = favoritesService.getFavorites(username);
             return ResponseEntity.ok(favorites);
         } catch (Exception e) {
-            System.out.println("Ошибка получения избранного для пользователя " + user + ": " + e.getMessage());
-            return ResponseEntity.ok(java.util.List.of()); // Возвращаем пустой список вместо ошибки
+            System.out.println("Ошибка получения избранного: " + e.getMessage());
+            return ResponseEntity.ok(java.util.List.of());
         }
     }
 
     @PostMapping("/{designId}")
-    public ResponseEntity<Void> addFavorite(@PathVariable String designId, @RequestParam(required = false) String username) {
-        String user = username != null ? username : DEFAULT_USER;
+    public ResponseEntity<String> addFavorite(@PathVariable String designId) {
         try {
-            favoritesService.addFavorite(user, designId);
-            System.out.println("Дизайн " + designId + " добавлен в избранное для пользователя " + user);
-            return ResponseEntity.ok().build();
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+
+            favoritesService.addFavorite(username, designId);
+            System.out.println("Дизайн " + designId + " добавлен в избранное для пользователя " + username);
+            return ResponseEntity.ok("Дизайн добавлен в избранное");
         } catch (Exception e) {
             System.out.println("Ошибка добавления в избранное: " + e.getMessage());
-            return ResponseEntity.ok().build(); // Игнорируем ошибки для демо
+            return ResponseEntity.badRequest().body("Ошибка добавления в избранное: " + e.getMessage());
         }
     }
 
     @DeleteMapping("/{designId}")
-    public ResponseEntity<Void> removeFavorite(@PathVariable String designId, @RequestParam(required = false) String username) {
-        String user = username != null ? username : DEFAULT_USER;
+    public ResponseEntity<String> removeFavorite(@PathVariable String designId) {
         try {
-            favoritesService.removeFavorite(user, designId);
-            System.out.println("Дизайн " + designId + " удален из избранного для пользователя " + user);
-            return ResponseEntity.ok().build();
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+
+            favoritesService.removeFavorite(username, designId);
+            System.out.println("Дизайн " + designId + " удален из избранного для пользователя " + username);
+            return ResponseEntity.ok("Дизайн удален из избранного");
         } catch (Exception e) {
             System.out.println("Ошибка удаления из избранного: " + e.getMessage());
-            return ResponseEntity.ok().build(); // Игнорируем ошибки для демо
+            return ResponseEntity.badRequest().body("Ошибка удаления из избранного: " + e.getMessage());
         }
     }
 }
