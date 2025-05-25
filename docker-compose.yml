@@ -8,7 +8,9 @@ services:
       - mongodb
     environment:
       - ML_SERVICE_URL=http://ml-service:8000
-      - MONGODB_URI=mongodb://mongodb:27017/nail_design
+      - MONGODB_URI=mongodb://mongodb:27017/nail_design_db
+    volumes:
+      - ./uploads:/app/uploads
 
   ml-service:
     build:
@@ -32,4 +34,3 @@ services:
 
 volumes:
   mongo-data:
-

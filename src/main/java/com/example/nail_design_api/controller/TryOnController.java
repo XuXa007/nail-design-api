@@ -19,7 +19,7 @@ public class TryOnController {
 
     private static final Logger logger = Logger.getLogger(TryOnController.class.getName());
 
-    @Value("${ml-service.url}")
+    @Value("${ml-service.url:http://ml-service:8000}")
     private String mlServiceUrl;
 
     @Autowired
@@ -28,15 +28,6 @@ public class TryOnController {
     @Autowired
     private TryOnService tryOnService;
 
-    /**
-     * Эндпоинт для виртуальной примерки дизайна ногтей
-     *
-     * @param photo Фотография руки
-     * @param designId ID дизайна
-     * @param threshold Порог уверенности для обнаружения ногтей (опционально)
-     * @param opacity Непрозрачность наложения дизайна (опционально)
-     * @return Изображение руки с примененным дизайном
-     */
     @PostMapping("/tryon")
     public ResponseEntity<byte[]> tryOnDesign(
             @RequestParam("photo") MultipartFile photo,
