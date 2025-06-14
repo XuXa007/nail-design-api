@@ -39,36 +39,48 @@ public class DataInitMongoService implements CommandLineRunner {
         mongo.dropCollection(Design.class);
 
         List<Design> designs = List.of(
-                new Design(null, "Classic Red", "Классический красный френч-маникюр",
-                        List.of("red"), "classic", "autumn", "french", "gel",
+                new Design(null, "Классический красный", "Классический красный френч-маникюр",
+                        List.of("red"), "classic", "autumn", "medium", "gel",
                         "simple_red.jpg", "simple_red_thumb.jpg"),
 
-                new Design(null, "Vibrant Fuchsia", "Яркий фуксия цвет с блестками",
-                        List.of("fuchsia"), "bold", "party", "glitter", "acrylic",
+                new Design(null, "Яркий фуксия", "Яркий фуксия цвет с блестками",
+                        List.of("fuchsia"), "bold", "summer", "medium", "acrylic",
                         "simple_pink.jpg", "simple_pink_thumb.jpg"),
 
-                new Design(null, "Soft Lavender", "Нежный лавандовый френч маникюр",
-                        List.of("purple"), "pastel", "spring", "french", "gel",
+                new Design(null, "Нежный лавандовый", "Нежный лавандовый  маникюр",
+                        List.of("purple"), "pastel", "spring", "medium", "gel",
                         "simple_violet.jpg", "simple_violet_thumb.jpg"),
 
-                new Design(null, "Olive Touch", "Оливковый матовый маникюр на каждый день",
-                        List.of("olive"), "matte", "winter", "matte", "gel",
+                new Design(null, "Оливковый матовый", "Оливковый матовый маникюр на каждый день",
+                        List.of("olive"), "matte", "winter", "medium", "gel",
                         "simple_grey_green.jpg", "simple_grey_green_thumb.jpg"),
 
-                new Design(null, "Mint Fresh", "Свежий мятный омбре маникюр",
-                        List.of("mint"), "pastel", "spring", "ombre", "gel",
+                new Design(null, "Свежий мятный", "Свежий мятный омбре маникюр",
+                        List.of("mint"), "pastel", "spring", "medium", "gel",
                         "simple_green.jpg", "simple_green_thumb.jpg"),
 
-                new Design(null, "Natural Nude", "Нюдовый натуральный френч маникюр",
-                        List.of("nude"), "nude", "everyday", "french", "gel",
+                new Design(null, "Нюдовый натуральный", "Нюдовый натуральный френч маникюр",
+                        List.of("nude"), "nude", "everyday", "medium", "gel",
                         "simple.jpg", "simple_thumb.jpg"),
 
-                new Design(null, "Deep Burgundy", "Глубокий бордовый матовый маникюр",
-                        List.of("burgundy"), "dark", "winter", "matte", "gel",
-                        "simple_wien.jpg", "simple_wien_thumb.jpg")
+                new Design(null, "Глубокий бордовый", "Глубокий бордовый матовый маникюр",
+                        List.of("burgundy"), "dark", "winter", "medium", "gel",
+                        "simple_wien.jpg", "simple_wien_thumb.jpg"),
+
+                new Design(null, "Яркий оранжевый", "Яркий оранжевый маникюр",
+                        List.of("orange", "pink"), "bold", "summer", "medium", "gel",
+                        "pink-or.jpg", "pink-or_thumb.jpg"),
+
+                new Design(null, "Классический белый", "Классический белый маникюр",
+                        List.of("white"), "classic", "summer", "medium", "gel",
+                        "white.jpg", "white_thumb.jpg"),
+
+                new Design(null, "Классический оранжевый", "Классический оранжевый маникюр",
+                        List.of("orange"), "classic", "everyday", "medium", "gel",
+                        "or.jpg", "or_thumb.jpg")
         );
 
         repo.saveAll(designs);
-        System.out.println("✅ Saved designs count: " + repo.count());
+        System.out.println("✅ designs count: " + repo.count());
     }
 }

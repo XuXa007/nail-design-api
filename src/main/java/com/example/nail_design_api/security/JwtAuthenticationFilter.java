@@ -37,14 +37,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String username = jwtUtils.getUsernameFromJwtToken(jwt);
                 String role = jwtUtils.getRoleFromJwtToken(jwt);
 
-                // Проверяем, что пользователь существует
                 User user = userService.findByUsername(username);
                 if (user != null) {
-                    // Создаем аутентификацию с ролью пользователя
                     List<SimpleGrantedAuthority> authorities = List.of(
                             new SimpleGrantedAuthority("ROLE_" + role)
                     );
-
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(username, null, authorities);
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

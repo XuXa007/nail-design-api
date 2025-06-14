@@ -3,7 +3,6 @@ package com.example.nail_design_api.service;
 import com.example.nail_design_api.dto.DesignDTO;
 import com.example.nail_design_api.dto.DesignFilterDto;
 import com.example.nail_design_api.model.Design;
-//import com.example.nail_design_api.dto.DesignDto;
 import com.example.nail_design_api.repository.DesignRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,7 +50,6 @@ public class DesignService {
         }
         if (color != null && !color.isEmpty()) {
             list = list.stream()
-                    // проверяем, содержится ли нужный цвет в списке
                     .filter(d -> d.getColors().contains(color))
                     .collect(Collectors.toList());
         }

@@ -24,11 +24,9 @@ public class FavoritesService {
     private String serverUrl;
 
     private synchronized User getOrCreateUser(String username) {
-        // Сначала пытаемся найти существующего пользователя
         return userRepository.findByUsername(username)
                 .orElseGet(() -> {
                     try {
-                        // Проверяем еще раз на случай, если пользователь был создан в другом потоке
                         return userRepository.findByUsername(username)
                                 .orElseGet(() -> {
                                     System.out.println("Создаем нового пользователя: " + username);
@@ -37,7 +35,6 @@ public class FavoritesService {
                                     user.setEmail(username + "@demo.com");
                                     user.setPassword("demo123");
 
-                                    // Устанавливаем роль в зависимости от username
                                     if (username.equals("demo_master")) {
                                         user.setRole(User.UserRole.MASTER);
                                         user.setSalonName("Демо Салон");
@@ -52,8 +49,6 @@ public class FavoritesService {
                                     try {
                                         return userRepository.save(user);
                                     } catch (Exception e) {
-                                        // Если произошла ошибка при сохранении (например, дублирование),
-                                        // пытаемся найти уже существующего пользователя
                                         System.out.println("Ошибка создания пользователя, ищем существующего: " + e.getMessage());
                                         return userRepository.findByUsername(username)
                                                 .orElseThrow(() -> new RuntimeException("Не удалось создать или найти пользователя: " + username));

@@ -8,7 +8,6 @@ public class UserDTO {
     private String id;
     private String username;
     private String email;
-//только для входящих запросов
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
@@ -100,7 +99,6 @@ public class UserDTO {
         dto.setAddress(user.getAddress());
         dto.setFavoriteDesignIds(user.getFavoriteDesignIds());
         dto.setCreatedDesignIds(user.getCreatedDesignIds());
-        // Не устанавливаем пароль!
         return dto;
     }
 }

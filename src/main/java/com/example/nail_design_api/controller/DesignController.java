@@ -14,9 +14,6 @@ public class DesignController {
     @Value("${server.url}")
     private String serverUrl;
 
-    @Value("${upload.path}")
-    private String uploadPath;
-
     @Autowired
     private DesignRepository repo;
 

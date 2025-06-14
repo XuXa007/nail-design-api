@@ -30,16 +30,10 @@ public class DemoUserInitService implements CommandLineRunner {
         System.out.println("🔧 Инициализация демо-пользователей...");
 
         try {
-            // Очищаем дубликаты пользователей
             cleanupDuplicateUsers("demo_client");
             cleanupDuplicateUsers("demo_master");
-
-            // Создаем демо-клиента если его нет
             createUserIfNotExists("demo_client", User.UserRole.CLIENT, null, null);
-
-            // Создаем демо-мастера если его нет
             createUserIfNotExists("demo_master", User.UserRole.MASTER, "Демо Салон", "Демо Адрес");
-
             System.out.println("✅ Демо-пользователи готовы");
 
         } catch (Exception e) {
@@ -50,32 +44,29 @@ public class DemoUserInitService implements CommandLineRunner {
 
     private void cleanupDuplicateUsers(String username) {
         try {
-            // Найдем всех пользователей с таким username
             Query query = new Query(Criteria.where("username").is(username));
             List<User> duplicates = mongoTemplate.find(query, User.class);
 
             if (duplicates.size() > 1) {
-                System.out.println("🧹 Найдено " + duplicates.size() + " дубликатов для " + username + ", очищаем...");
+                System.out.println("Найдено " + duplicates.size() + " дубликатов для " + username + ", очищаем...");
 
-                // Удаляем всех
                 mongoTemplate.remove(query, User.class);
-                System.out.println("✅ Дубликаты для " + username + " удалены");
+                System.out.println("Дубликаты для " + username + " удалены");
             } else if (duplicates.size() == 1) {
-                System.out.println("✅ Пользователь " + username + " уже существует (без дубликатов)");
+                System.out.println("Пользователь " + username + " уже существует (без дубликатов)");
             }
         } catch (Exception e) {
-            System.out.println("⚠️ Ошибка при очистке дубликатов для " + username + ": " + e.getMessage());
+            System.out.println("⚠️ Ошибка " + username + ": " + e.getMessage());
         }
     }
 
     private void createUserIfNotExists(String username, User.UserRole role, String salonName, String address) {
         try {
-            // Проверяем существование пользователя
             Query query = new Query(Criteria.where("username").is(username));
             User existingUser = mongoTemplate.findOne(query, User.class);
 
             if (existingUser == null) {
-                System.out.println("➕ Создаем пользователя: " + username);
+                System.out.println("Создаем пользователя: " + username);
 
                 User user = new User();
                 user.setUsername(username);
@@ -92,12 +83,12 @@ public class DemoUserInitService implements CommandLineRunner {
                 user.setCreatedDesignIds(new HashSet<>());
 
                 mongoTemplate.save(user);
-                System.out.println("✅ Создан пользователь: " + username + " (роль: " + role + ")");
+                System.out.println("✅ Создан: " + username + " (роль: " + role + ")");
             } else {
-                System.out.println("ℹ️ Пользователь " + username + " уже существует");
+                System.out.println("Пользователь " + username + " уже существует");
             }
         } catch (Exception e) {
-            System.out.println("❌ Ошибка создания пользователя " + username + ": " + e.getMessage());
+            System.out.println("❌ Ошибка " + username + ": " + e.getMessage());
             e.printStackTrace();
         }
     }

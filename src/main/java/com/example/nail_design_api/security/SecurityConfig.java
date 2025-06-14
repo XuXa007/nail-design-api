@@ -46,7 +46,6 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(authz -> authz
-                        // Публичные эндпоинты
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/designs").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/designs/filter").permitAll()
@@ -54,14 +53,11 @@ public class SecurityConfig {
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/api/tryon").permitAll()
 
-                        // Эндпоинты, требующие аутентификации
                         .requestMatchers("/api/auth/favorites/**").authenticated()
                         .requestMatchers("/api/auth/profile/**").authenticated()
 
-                        // Эндпоинты только для мастеров
                         .requestMatchers("/api/master/**").hasRole("MASTER")
 
-                        // Все остальные запросы требуют аутентификации
                         .anyRequest().authenticated()
                 );
 

@@ -28,7 +28,6 @@ public class UserController {
     @PostMapping("/register/client")
     public ResponseEntity<?> registerClient(@RequestBody UserDTO userDTO) {
         try {
-            // не существует ли уже пользователь
             if (userService.existsByUsername(userDTO.getUsername())) {
                 return ResponseEntity.badRequest()
                         .body(new MessageResponse("Ошибка: Пользователь с таким именем уже существует!"));
@@ -41,7 +40,6 @@ public class UserController {
                     User.UserRole.CLIENT
             );
 
-            // JWT токен
             String jwt = jwtUtils.generateJwtToken(user.getUsername(), user.getRole().name());
 
             return ResponseEntity.ok(new AuthResponseDTO(jwt, UserDTO.fromUser(user)));
@@ -91,16 +89,13 @@ public class UserController {
                         .body(new MessageResponse("Пользователь не найден"));
             }
 
-            // check пароль
             if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
                 return ResponseEntity.badRequest()
                         .body(new MessageResponse("Неверный пароль"));
             }
 
-            // генер JWT токен
             String jwt = jwtUtils.generateJwtToken(user.getUsername(), user.getRole().name());
 
-            // возвращаем токен и информацию о пользователе
             return ResponseEntity.ok(new AuthResponseDTO(jwt, UserDTO.fromUser(user)));
 
         } catch (Exception e) {
@@ -172,7 +167,6 @@ public class UserController {
                 User user = userService.findByUsername(username);
 
                 if (user != null) {
-                    // Генерируем новый токен
                     String newToken = jwtUtils.generateJwtToken(user.getUsername(), user.getRole().name());
                     return ResponseEntity.ok(new AuthResponseDTO(newToken, UserDTO.fromUser(user)));
                 }
@@ -187,7 +181,6 @@ public class UserController {
         }
     }
 
-    // class для ответов с сообщениями
     public static class MessageResponse {
         private String message;
 

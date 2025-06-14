@@ -1,7 +1,5 @@
 package com.example.nail_design_api.dto;
 
-import com.example.nail_design_api.model.User;
-
 public class AuthResponseDTO {
     private String token;
     private String type = "Bearer";
@@ -12,7 +10,6 @@ public class AuthResponseDTO {
         this.user = user;
     }
 
-    // Getters and Setters
     public String getToken() {
         return token;
     }

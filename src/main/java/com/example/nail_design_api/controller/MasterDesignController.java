@@ -139,7 +139,6 @@ public class MasterDesignController {
                 return ResponseEntity.status(404).body(createErrorResponse("Дизайн не найден"));
             }
 
-            // Проверяем, что дизайн принадлежит текущему пользователю
             if (!username.equals(design.getCreatedBy())) {
                 return ResponseEntity.status(403).body(createErrorResponse("Вы можете просматривать только свои дизайны"));
             }

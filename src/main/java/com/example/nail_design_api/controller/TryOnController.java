@@ -39,18 +39,14 @@ public class TryOnController {
             logger.info("Получен запрос на примерку дизайна: designId=" + designId
                     + ", threshold=" + threshold + ", opacity=" + opacity);
 
-            // Валидация запроса через сервис
             if (!tryOnService.processTryOnRequest(photo, designId)) {
                 return ResponseEntity.badRequest().build();
             }
 
-            // Формируем URL для ML сервиса
             String url = mlServiceUrl + "/api/tryon";
 
-            // Подготавливаем multipart/form-data для отправки
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
 
-            // Добавляем изображение
             ByteArrayResource photoResource = new ByteArrayResource(photo.getBytes()) {
                 @Override
                 public String getFilename() {
@@ -78,12 +74,10 @@ public class TryOnController {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 logger.info("Получен успешный ответ от ML сервиса");
 
-                // Настраиваем заголовки ответа
                 HttpHeaders responseHeaders = new HttpHeaders();
                 responseHeaders.setContentType(MediaType.IMAGE_JPEG);
                 responseHeaders.setCacheControl(CacheControl.noCache().getHeaderValue());
 
-                // Возвращаем обработанное изображение
                 return new ResponseEntity<>(response.getBody(), responseHeaders, HttpStatus.OK);
             } else {
                 logger.warning("Получен неуспешный ответ от ML сервиса: " + response.getStatusCode());

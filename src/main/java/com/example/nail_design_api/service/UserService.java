@@ -28,17 +28,6 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public User login(String username, String password) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
-
-        if (!user.getPassword().equals(password)) {
-            throw new RuntimeException("Неверный пароль");
-        }
-
-        return user;
-    }
-
     public User findByUsername(String username) {
         return userRepository.findByUsername(username)
                 .orElse(null);
